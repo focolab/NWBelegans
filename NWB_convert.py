@@ -10,7 +10,7 @@ import numpy as np
 import pandas as pd
 from pynwb import load_namespaces, get_class, register_class, NWBFile, TimeSeries, NWBHDF5IO
 from pynwb.file import MultiContainerInterface, NWBContainer, Device, Subject
-from pynwb.ophys import ImageSeries, OnePhotonSeries, OpticalChannel, ImageSegmentation, PlaneSegmentation, Fluorescence, CorrectedImageStack, MotionCorrection, RoiResponseSeries, ImagingPlane
+from pynwb.ophys import ImageSeries, OnePhotonSeries, OpticalChannel, ImageSegmentation, PlaneSegmentation, Fluorescence, CorrectedImageStack, MotionCorrection, RoiResponseSeries, ImagingPlane, DfOverF
 from pynwb.core import NWBDataInterface
 from pynwb.epoch import TimeIntervals
 from pynwb.behavior import SpatialSeries, Position
@@ -148,7 +148,7 @@ def create_vol_seg_centers(name, description, ImagingVolume, positions, labels=N
 
     return vs
 
-def create_calc_series(name, data, imaging_plane, unit, scan_line_rate, dimension, rate, compression = False):
+def create_calc_series(name, data, imaging_plane, unit, scan_line_rate, dimension, rate, resolution, compression = False):
 
     if compression:
         data = H5DataIO(data=data, compression="gzip", compression_opts=4)
@@ -160,6 +160,7 @@ def create_calc_series(name, data, imaging_plane, unit, scan_line_rate, dimensio
         scan_line_rate = scan_line_rate,
         dimension = dimension,
         rate = rate,
+        resolution= resolution,
         imaging_plane = imaging_plane
     )
 
@@ -191,7 +192,7 @@ def iter_calc_tiff(filename, numZ):
     return
 
 
-def process_NP_FOCO_Ray(datapath, dataset):
+def process_NP_FOCO_Ray(datapath, dataset, strain):
 
     identifier = dataset
     session_description = 'NeuroPAL and calcium imaging of immobilized worm with optogenetic stimulus'
@@ -208,7 +209,7 @@ def process_NP_FOCO_Ray(datapath, dataset):
     gs_time = pd.Timedelta(hours=2, minutes=30).isoformat()
     cultivation_temp = 20.
     sex = "O"
-    strain = "OH16230"
+    strain = strain
 
     nwbfile = create_subject(nwbfile, subject_description, identifier, dob, growth_stage, gs_time, cultivation_temp, sex, strain)
 
@@ -304,7 +305,7 @@ def process_NP_FOCO_Ray(datapath, dataset):
 
     Calc_name = 'CalciumImageSeries'
 
-    Calc_ImSeries = create_calc_series(Calc_name, data, Calc_ImVol, "n/a", 0.5, [numx, numy, numz])
+    Calc_ImSeries = create_calc_series(Calc_name, data, Calc_ImVol, "n/a", 0.5, [numx, numy, numz], 1.04, 1, compression=True)
 
     nwbfile.add_acquisition(Calc_ImSeries)
 
@@ -353,8 +354,8 @@ def process_NP_FOCO_Ray(datapath, dataset):
         description = 'Fluorescence activity for calcium imaging data',
         data = gce_data,
         rois = rt_region,
-        unit = '',
-        rate = 4.0
+        unit = 'Percentage',
+        rate = 1.04
     )
 
     fluor = Fluorescence(
@@ -386,6 +387,6 @@ if __name__ == '__main__':
 
         print(folder)
         t0 = time.time()
-        process_NP_FOCO_Ray(datapath, folder)
+        process_NP_FOCO_Ray(datapath, folder, strain)
         t1 = time.time()
         print(t1-t0)
