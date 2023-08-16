@@ -1,15 +1,11 @@
 # C. elegans optophysiology NWB conversion
-## Author: FoCo Lab
+## Author: Daniel Sprague
 
 This repository contains tutorials and examples of conversions of NeuroPAL structural images and whole-brain calcium imaging data 
 and metadata to the standard NWB format. 
 
 Start with the NWB_tutorial.ipynb file which provides a walkthrough of the basics of NWB, creating objects, adding data, and writing
 the NWB file to disk.
-
-Create_NWB.ipynb has additional examples of converting datasets from various file formats. We hope to continue to update this page 
-with other examples of converting a range of different types of data to help researchers new to NWB convert their data quickly and 
-efficiently.
 
 After you have created your NWB files, follow the instructions at https://www.dandiarchive.org/handbook/13_upload/ to upload your data 
 to Dandi.
