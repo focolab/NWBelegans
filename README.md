@@ -7,7 +7,7 @@ This repository contains tutorials and examples of conversions of NeuroPAL struc
 and metadata to the standard NWB format. 
 
 Start with the NWB_tutorial.ipynb file which provides a walkthrough of the basics of NWB, creating objects, adding data, and writing
-the NWB file to disk. Please read the NWB file components section of this README as well for descriptions of the contents of the NWB files and conventions for naming objects.
+the NWB file to disk. Please read the NWB file components section of this README as well for descriptions of the contents of the NWB files and conventions for naming objects. Go to https://ucsf.box.com/s/8kbdfywefcfsn4pfextrzcr25az1vmuj for a video tutorial and a folder containing the example data used in the tutorial.
 
 After you have created your NWB files, follow the instructions at https://www.dandiarchive.org/handbook/13_upload/ to upload your data 
 to Dandi.
