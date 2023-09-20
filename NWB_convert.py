@@ -479,9 +479,9 @@ def process_yemini(folder):
 
     blobs = csv[['Real X (um)', 'Real Y (um)', 'Real Z (um)', 'User ID']]
     blobs = blobs.rename(columns={'Real X (um)':'X', 'Real Y (um)':'Y', 'Real Z (um)':'Z', 'User ID':'ID'})
-    blobs['X'] = round(blobs['X'].div(scale[0]))
-    blobs['Y'] = round(blobs['Y'].div(scale[1]))
-    blobs['Z'] = round(blobs['Z'].div(scale[2]))
+    blobs['X'] = round(blobs['X'].div(scale[0])) -1
+    blobs['Y'] = round(blobs['Y'].div(scale[1])) -1
+    blobs['Z'] = round(blobs['Z'].div(scale[2])) -1
     blobs = blobs.astype({'X':'uint16', 'Y':'uint16', 'Z':'uint16'})
     pos = np.asarray(blobs[['X', 'Y', 'Z']])
     IDs = blobs['ID']
@@ -615,7 +615,7 @@ def process_yemini(folder):
 if __name__ == '__main__':
     datapath = '/Users/danielysprague/foco_lab/data'
 
-    
+    '''
     strain_dict = {'20221028-18-48-00':'FC121', '20221106-21-00-09':'FC121', '20221106-21-23-19':'FC121',
                    '20221106-21-23-19':'FC121', '20221106-21-47-31':'FC121', '20221215-20-02-49':'FC121',
                    '20221215-22-02-55':'FC121', '20230412-20-15-17':'FC121', '20230322-18-57-04':'OH16230',
@@ -642,4 +642,4 @@ if __name__ == '__main__':
         process_yemini(datapath + '/Yemini_21/OH16230/Heads/'+folder)
         t1 = time.time()
         print(t1-t0)
-    '''
+    
