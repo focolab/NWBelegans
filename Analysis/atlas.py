@@ -150,7 +150,7 @@ class NPAtlas:
         df_conv_atlas['ganglion'] = pd.Categorical(df_conv_atlas['ganglion'], categories=custom_sort_order, ordered=True)
 
         # Sort the DataFrame first by 'class' and then by 'ID'
-        df_sorted = df_conv_atlas.sort_values(by=['ganglion', 'ID'])
+        df_sorted = df_conv_atlas.sort_values(by=['ganglion', 'h'])
 
         # Reset the index if needed
         df_sorted = df_sorted.reset_index(drop=True)

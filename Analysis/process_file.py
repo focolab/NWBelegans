@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from pynwb import load_namespaces, get_class, register_class, NWBFile, TimeSeries, NWBHDF5IO
+from sklearn.neighbors import NearestNeighbors
 
 
 
@@ -50,13 +51,37 @@ def get_dataset_neurons(folder):
 
 
 def combine_datasets(datasets):
+
     for i, dataset in enumerate(datasets):
         if i ==0:
-            upd_data = dataset
+            upd_data = dataset.copy()
         else:
             upd_data.update(dataset)
 
     return upd_data
+
+def get_neur_nums(tot_dataset, atlas):
+
+    neur_IDs = atlas.df['ID']
+
+    num_datasets = len(tot_dataset.keys())
+    neurons = {k:0 for k in neur_IDs}
+
+    for dataset in tot_dataset.keys():
+        blobs = tot_dataset[dataset]
+
+        for i, row in blobs.iterrows():
+            ID = row['ID']
+            if ID == '':
+                continue
+
+            if not ID in neurons:
+                neurons[ID] = 1
+
+            else:
+                neurons[ID] += 1
+
+    return neurons, num_datasets
 
 def get_pairings(dataset):
     pairings = {}
@@ -64,13 +89,16 @@ def get_pairings(dataset):
     for file, blobs in dataset.items():
         IDd = blobs[blobs['ID']!='']
 
+        IDd.reset_index()
+
         for i in range(len(IDd)):
             for j in range(i,len(IDd)):
-                label1 = blobs.loc[i,'ID']
-                label2 = blobs.loc[j, 'ID']
 
-                xyz1 = np.asarray(blobs.loc[i,['xr','yr','zr']])
-                xyz2 = np.asarray(blobs.loc[j,['xr','yr','zr']])
+                label1 = IDd.loc[IDd.index[i],'ID']
+                label2 = IDd.loc[IDd.index[j], 'ID']
+
+                xyz1 = np.asarray(IDd.loc[IDd.index[i],['xr','yr','zr']])
+                xyz2 = np.asarray(IDd.loc[IDd.index[j],['xr','yr','zr']])
                 
                 dist = np.linalg.norm(xyz1 - xyz2)
 
@@ -92,3 +120,58 @@ def get_pairings(dataset):
                         pairings[pair2].append(dist)
 
     return pairings
+
+def get_color_discrim(folder, numneighbors): 
+
+    color_discrim = {}
+
+    for file in os.listdir(folder):
+        if not file[-4:] == '.nwb':
+            continue
+
+        print(file)
+
+        blobs, rgb_data = get_nwb_neurons(folder+'/'+file)
+
+        color_norm = (rgb_data - np.min(rgb_data, axis=(0,1,2))) / (np.max(rgb_data, axis=(0,1,2))- np.min(rgb_data, axis=(0,1,2)))
+
+        blobs[['Rnorm', 'Gnorm','Bnorm']] = np.nan
+
+        color_data = np.zeros(len(blobs))
+
+        for i, row in blobs.iterrows():
+            colors = color_norm[max(row['x']-2,0):min(row['x']+2,rgb_data.shape[0]-1),max(row['y']-2,0):min(row['y']+2,rgb_data.shape[1]-1),max(row['z']-1,0):min(row['z']+1,rgb_data.shape[2]-1),:]
+
+            flat_colors = colors.reshape(-1, colors.shape[-1])
+            
+            Rnorm = np.median(flat_colors[0])
+            Gnorm = np.median(flat_colors[1])
+            Bnorm = np.median(flat_colors[2])
+
+            blobs.loc[i, 'Rnorm'] = Rnorm
+            blobs.loc[i, 'Gnorm'] = Gnorm
+            blobs.loc[i, 'Bnorm'] = Bnorm
+
+        neighbors = NearestNeighbors(n_neighbors=numneighbors, algorithm='auto')
+
+        X = np.asarray(blobs[['xr', 'yr', 'zr']])
+        neighbors.fit(X)
+
+        neighbor_dists, neighbor_index = neighbors.kneighbors(X=X, return_distance=True) #n_query x n_neighbors size matrix of distances to neighbors and indices in training data of closest neighbors
+
+        for i, row in blobs.iterrows():
+            neighbors= neighbor_index[i,1:]
+            neighb_dists = neighbor_dists[i, 1:]
+            neighb_dist_norm = 1- neighb_dists/sum(neighb_dists) #normalize distances of neighbors and then flip so that closest neighbors have highest weight
+            color_dists = np.zeros(numneighbors-1)
+            rgb = np.asarray(row[['Rnorm', 'Gnorm', 'Bnorm']])
+            for j, neighbor in enumerate(neighbors):
+                n_rgb = np.asarray(blobs.loc[neighbor,['Rnorm','Gnorm','Bnorm']])
+                color_dists[j] = np.linalg.norm(rgb-n_rgb)
+            avg_dist = np.dot(neighb_dist_norm, color_dists) #weighted average color distances to k nearest neighbors - proxy for discriminability to closest neighbors based on color
+
+            color_data[i] = avg_dist
+
+        color_discrim[file] = color_data
+
+    return color_discrim                

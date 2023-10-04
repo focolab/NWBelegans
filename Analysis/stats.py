@@ -38,3 +38,4 @@ def analyze_pairs(pairings, neuron_ganglia, num_datasets):
                 std_heatmap[j,i] = np.std(pairings[pair])
 
     return num_pairings, num_heatmap/num_datasets, std_heatmap
+

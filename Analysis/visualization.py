@@ -215,3 +215,64 @@ def plot_atlas_2d_views(df_atlas, sigma, df_data):
 
     #plt.tight_layout()
     plt.show()
+
+
+def plot_color_discrim(datasets, labels):
+
+    data = {}
+
+    for i in range(len(datasets)):
+        category = labels[i]
+        data[category] = np.concatenate([val for val in datasets[i].values()])
+
+    series_list = [pd.Series(data[key],name=key) for key in data]
+
+    df = pd.concat(series_list, axis=1)
+
+    melted = pd.melt(df, var_name = 'dataset', value_name='avg_col_dist')
+
+    sns.set(style='whitegrid')
+
+    sns.catplot(x='dataset', y='avg_col_dist', data=melted, kind='violin')
+
+    plt.xlabel('Dataset')
+    plt.ylabel('Average normalized color distance to neighbors')
+    plt.title('Weighted average of color discriminability to 6 nearest neighbors of each neuron')
+
+    plt.show()
+
+def plot_neur_nums(neurons, num_datasets, atlas):
+
+    neur_df = atlas.df[['ID', 'ganglion']]
+
+    dict_df = pd.DataFrame(list(neurons.items()), columns = ['ID', 'num'])
+    dict_df['frac'] = dict_df['num']/num_datasets
+ 
+    merged = pd.merge(neur_df, dict_df, on='ID') #this will preserve the order of neurons from neur_df which is sorted by ganglion and then distance along x axis
+
+    sns.set(style='whitegrid')
+
+    plt.figure(figsize=(12,8))
+    sns.barplot(x='ID', y='frac', hue='ganglion', data=merged)
+
+    plt.xlabel('Neuron IDs')
+    plt.ylabel('Fraction of datasets with ground truth labeled neuron')
+
+    plt.xticks(rotation=60, ha='right', fontsize=6)
+
+    bar_width = 0.7
+
+    for patch in plt.gca().patches:
+        current_width = patch.get_width()
+        diff = current_width - bar_width
+
+        # Change the bar width
+        patch.set_width(bar_width)
+
+        # Recenter the bar
+        patch.set_x(patch.get_x() + diff * .5)
+
+    # Show the plot
+    plt.legend(title='ganglion', loc='upper right')
+
+    plt.show()
