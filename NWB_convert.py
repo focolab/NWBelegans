@@ -18,6 +18,7 @@ from pynwb.image import ImageSeries
 import scipy.io as sio
 import skimage.io as skio
 from tifffile import TiffFile
+import tifffile
 import time
 
 # ndx_mulitchannel_volume is the novel NWB extension for multichannel optophysiology in C. elegans
@@ -210,6 +211,110 @@ def iter_calc_tiff(filename, numZ):
     tif.close()
 
     return
+
+def process_NP_FOCO_original(datapath, dataset, strain):
+
+    identifier = dataset
+    session_description = 'NeuroPAL and calcium imaging of immobilized worm with optogenetic stimulus'
+    session_start_time = datetime(int(identifier[0:4]), int(identifier[5:7]), int(identifier[8:10]), tzinfo=tz.gettz("US/Pacific"))
+    lab = 'FOCO lab'
+    institution = 'UCSF'
+    pubs = ''
+    experimenter = 'Jackson Borchardt + Greg Bubnis'
+    experiment_description = 'NeuroPAL images and basic GCaMP'
+
+    nwbfile = gen_file(session_description, experimenter, experiment_description, identifier, session_start_time, lab, institution, pubs)
+
+    subject_description = 'NeuroPAL worm in microfluidic chip'
+    dob = datetime(int(identifier[0:4]), int(identifier[5:7]), int(identifier[8:10]), tzinfo=tz.gettz("US/Pacific"))
+    growth_stage = 'YA'
+    gs_time = pd.Timedelta(hours=2, minutes=30).isoformat()
+    cultivation_temp = 20.
+    sex = "O"
+
+    nwbfile = create_subject(nwbfile, subject_description, identifier, dob, growth_stage, gs_time, cultivation_temp, sex, strain)
+
+    microname = "Spinning disk confocal"
+    microdescrip = "Leica DMi8 Inverted Microscope with Yokogawa CSU-W1 SoRA, 40x WI objective 1.1 NA"
+    manufacturer = "Leica, Yokogawa"
+
+    microscope = create_device(nwbfile, microname, microdescrip, manufacturer)
+
+    matfile = datapath + '/NP_FOCO_cropped/' +dataset +'/neuropal_1_MMStack_Pos0.ome.mat'
+    mat = sio.loadmat(matfile)
+    scale = np.asarray(mat['info']['scale'][0][0]).flatten()
+
+    channels = [("mNeptune 2.5", "Chroma ET 700/75", "561-700-75m"), ("Tag RFP-T", "Chroma ET 605/70", "561-605-70m"), ("CyOFP1", "Chroma ET 605/70","488-605-70m"), ("GFP-GCaMP", "Chroma ET 525/50","488-525-50m"), ("mTagBFP2", "Chroma ET 460/50", "405-460-50m"),  ("mNeptune 2.5-far red", "Chroma ET 700/75", "639-700-75m")]
+    RGBW_channels = [0,2,4,1]
+
+    NP_descrip = 'NeuroPAL image of C. elegans brain'
+
+    NP_ImVol, NP_OptChanRef = create_im_vol(nwbfile, 'NeuroPALImVol', microscope, NP_descrip,channels, location="head", grid_spacing = scale)
+
+    raw_file = datapath + '/NP_FOCO_cropped/' + dataset + '/neuropal_1_MMStack_Pos0.ome.tif'
+    data = skio.imread(raw_file)
+    data = np.transpose(data)
+
+    ImDescrip = 'NeuroPAL structural image'
+
+    NP_image = create_image('NeuroPALImageRaw', ImDescrip, data, NP_ImVol, NP_OptChanRef, RGBW_channels=RGBW_channels)
+
+    nwbfile.add_acquisition(NP_image)
+
+    blob_file = datapath + '/NP_FOCO_cropped/' + dataset + '/blobs.csv'
+    blobs = pd.read_csv(blob_file)
+
+    IDs = blobs['ID']
+    labels = IDs.replace(np.nan,'',regex=True)
+    labels = list(np.asarray(labels)) 
+    positions = np.asarray(blobs[['X', 'Y', 'Z']])
+
+    vs_descrip = 'Neuron centers for multichannel volumetric image. Weight set at 1 for all voxels. Labels refers to cell ID of segmented neurons.'
+
+    NeuroPALImSeg = ImageSegmentation(
+        name = 'NeuroPALSegmentation',
+        plane_segmentations = create_vol_seg_centers('NeuroPALNeurons', vs_descrip, NP_ImVol, positions, labels=labels)
+    )
+
+    neuroPAL_module = nwbfile.create_processing_module(
+        name = 'NeuroPAL',
+        description = 'NeuroPAL image data and metadata'
+    )
+
+    neuroPAL_module.add(NeuroPALImSeg)
+    neuroPAL_module.add(NP_OptChanRef)
+
+    Proc_descrip = 'Processed NeuroPAL image'
+
+    Proc_ImVol, Proc_OptChanRef = create_im_vol(nwbfile, 'ProcessedImVol', microscope, Proc_descrip,[channels[i] for i in RGBW_channels])
+
+    if not os.path.exists(datapath+ '/NP_FOCO_hist_match/' + dataset + '/hist_match_image.tif'):
+        proc_mat = datapath+ '/NP_FOCO_hist_match/' + dataset + '/hist_match_image.mat'
+
+        imfile = sio.loadmat(proc_mat)
+        im = np.transpose(imfile['Hist_RGBW'],(2,3,0,1))
+        im = im.astype('uint16')
+
+        tifffile.imwrite(datapath + '/NP_FOCO_hist_match/'+folder+'/hist_match_image.tif', im, imagej = True)
+
+    proc_file = datapath+ '/NP_FOCO_hist_match/' + dataset + '/hist_match_image.tif'
+    proc_data = np.transpose(skio.imread(proc_file), [2,1,0,3])
+
+    ProcDescrip = 'NeuroPAL image with median filtering followed by color histogram matching to reference NeuroPAL images'
+
+    Proc_image = create_image('ProcessedImage', ProcDescrip, proc_data, Proc_ImVol, Proc_OptChanRef, RGBW_channels=[0,1,2,3])
+
+    processed_im_module = nwbfile.create_processing_module(
+        name = 'ProcessedImage',
+        description = 'Data and metadata associated with the pre-processed neuroPAL image.'
+    )
+
+    processed_im_module.add(Proc_image)
+    processed_im_module.add(Proc_OptChanRef)
+
+    io = NWBHDF5IO(datapath + '/NWB_foco/'+identifier+'.nwb', mode='w')
+    io.write(nwbfile)
+    io.close()
 
 
 def process_NP_FOCO_Ray(datapath, dataset, strain):
@@ -633,7 +738,7 @@ if __name__ == '__main__':
         process_NP_FOCO_Ray(datapath, folder, strain)
         t1 = time.time()
         print(t1-t0)
-    '''
+    
     for folder in os.listdir(datapath+'/Yemini_21/OH16230/Heads'):
         if folder == '.DS_Store':
             continue
@@ -642,4 +747,11 @@ if __name__ == '__main__':
         process_yemini(datapath + '/Yemini_21/OH16230/Heads/'+folder)
         t1 = time.time()
         print(t1-t0)
-    
+    '''
+
+    for folder in os.listdir(datapath+'/NP_FOCO_cropped'):
+        if folder == '.DS_Store':
+            continue
+        strain = 'OH16230'
+
+        process_NP_FOCO_original(datapath, folder, strain)
