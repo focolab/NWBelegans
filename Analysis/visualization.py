@@ -5,6 +5,7 @@ import seaborn as sns
 from matplotlib.patches import Ellipse
 import matplotlib.transforms as transforms
 from utils import covar_to_coord
+from stats import get_accuracy
 
 
 def plot_summary_stats(segs, IDs, labels):
@@ -276,3 +277,35 @@ def plot_neur_nums(neurons, num_datasets, atlas):
     plt.legend(title='ganglion', loc='upper right')
 
     plt.show()
+
+def plot_accuracies(datasets, csv_folders, labels, LR=False, atlas=None, title = 'Accuracy by dataset'):
+
+    num_data_total = np.sum([len(dataset.keys()) for dataset in datasets])
+
+    accs = np.empty((num_data_total, 6), dtype='O')
+
+    k=0
+
+    for i, dataset in enumerate(datasets):
+        csv_folder = csv_folders[i]
+        label = labels[i]
+        for j, key in enumerate(dataset.keys()):
+            csv = csv_folder + key +'.csv'
+            IDd, per_ID, acc = get_accuracy(dataset[key], pd.read_csv(csv), LR=LR, atlas=atlas)
+            acc.append(label)
+            acc.append(key)
+            accs[k,:] = acc
+            k+=1
+
+    df = pd.DataFrame(accs, columns = ['top_acc', 'top_2_acc', 'top_3_acc', 'top_4_acc', 'dataset', 'identifier'])
+
+    g = sns.catplot(data=df, kind='box', x = 'dataset', y='top_acc', hue='dataset', orient='v', dodge=False)
+
+    plt.ylabel('Percent autoID accuracy')
+    plt.ylim((0,1))
+
+    plt.title('NeuroPAL AutoID accuracy by dataset')
+
+    plt.show()
+
+    return df

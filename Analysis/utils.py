@@ -10,10 +10,7 @@ def maha_dist(data, mu, sigma):
     left_data = np.dot(data_mu, inv_sigma)
     mahal = np.dot(left_data, data_mu.T)
 
-    if type(mahal) ==np.float:
-        return np.sqrt(mahal)
-    else:
-        return np.sqrt(mahal.diagonal())
+    return np.sqrt(mahal)
 
 def convert_coordinates(df, v1 = [[-40, 0, 0], [80, 0, -8]], v2=[[-40, 0, 0], [-40.8, 0, -12]], vRecenter=[0,0,0]):
     xyz = df[['X', 'Y', 'Z']]

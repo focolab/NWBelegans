@@ -717,6 +717,168 @@ def process_yemini(folder):
     io.write(nwbfile)
     io.close()
 
+def process_Yem_original(file):
+
+    worm = file.split('.')[0]
+
+    path = '/Users/danielysprague/foco_lab/data/NP_paper/all/'
+    matfile = path + file
+    ID_file = path + worm +'_ID.mat'
+    csvfile = path + worm + '.csv'
+
+    mat = sio.loadmat(matfile)
+
+    data = np.transpose(mat['data'], (1,0,2,3))
+
+    scale = np.asarray(mat['info']['scale'][0][0]).flatten()
+    prefs = np.asarray(mat['prefs']['RGBW'][0][0]).flatten()-1 #subtract 1 to adjust for matlab indexing from 1
+
+    session_start = datetime(2021,1,7, tzinfo=tz.gettz("US/Pacific")) #currently just using date of paper publication
+
+    experimenter = 'Yemini, Eviatar'
+    experiment_descrip = 'NeuroPAL whole-brain structural images'
+
+    nwbfile = gen_file('C. elegans head NeuroPAL', experimenter, experiment_descrip, worm, session_start, 'Hobert lab', 'Columbia University', ["NeuroPAL: A Multicolor Atlas for Whole-Brain Neuronal Identification in C. elegans"])
+
+    subject_description = 'NeuroPAL worm in microfluidic chip'
+    dob = session_start - timedelta(days=2)
+    growth_stage = 'YA'
+    gs_time = None
+    cultivation_temp = 20.
+    sex = "O"
+    strain = "OH16230"
+
+    nwbfile = create_subject(nwbfile, subject_description, worm, dob, growth_stage, gs_time, cultivation_temp, sex, strain)
+
+    microname = "Spinning disk confocal"
+    microdescrip = "Spinning Disk Confocal Nikon Ti-e 60x Objective, 1.2 NA	Nikon CFI Plan Apochromat VC 60XC WI"
+    manufacturer = "Nikon"
+
+    device = create_device(nwbfile, microname, microdescrip, manufacturer)
+
+    channels = [("mTagBFP2", "Semrock FF01-445/45-25 Brightline", "405-445-45m"), ("Tag RFP-T", "Semrock FF02-617/73-25 Brightline", "561-610-40m"), ("GFP-GCaMP", "Semrock FF02-525/40-25 Brightline", "488-525-25m"), ("CyOFP1", "Semrock FF02-617/73-25 Brightline", "488-610-40m"),  ("mNeptune 2.5", "Semrock FF01-731/137-25 Brightline","561-731-70m")]
+
+    NP_ImVol, NP_OptChanRef = create_im_vol(nwbfile, 'NeuroPALImVol', device, 'NeuroPAL image of C. elegans brain', channels, grid_spacing=scale)
+
+    csv = pd.read_csv(csvfile, skiprows=6)
+
+    blobs = csv[['Real X (um)', 'Real Y (um)', 'Real Z (um)', 'User ID']]
+    blobs = blobs.rename(columns={'Real X (um)':'X', 'Real Y (um)':'Y', 'Real Z (um)':'Z', 'User ID':'ID'})
+    blobs['X'] = round(blobs['X'].div(scale[0])) -1
+    blobs['Y'] = round(blobs['Y'].div(scale[1])) -1
+    blobs['Z'] = round(blobs['Z'].div(scale[2])) -1
+    blobs = blobs.astype({'X':'uint16', 'Y':'uint16', 'Z':'uint16'})
+    pos = np.asarray(blobs[['X', 'Y', 'Z']])
+    IDs = blobs['ID']
+    labels = IDs.replace(np.nan, '', regex=True)
+    labels = list(np.asarray(labels))
+
+    vs_descrip = 'Neuron centers for multichannel volumetric image. Weight set at 1 for all voxels. Labels refers to cell ID of segmented neurons.'
+
+    NeuroPALImSeg = ImageSegmentation(
+        name = 'NeuroPALSegmentation',
+        plane_segmentations = create_vol_seg_centers('NeuroPALNeurons', vs_descrip, NP_ImVol, pos, labels)
+    )
+
+    neuroPAL_module = nwbfile.create_processing_module(
+        name = 'NeuroPAL',
+        description = 'NeuroPAL image data and metadata'
+    )
+
+    neuroPAL_module.add(NeuroPALImSeg)
+    neuroPAL_module.add(NP_OptChanRef)
+
+    NP_descrip = 'NeuroPAL structural image'
+
+    NP_image = create_image('NeuroPALImageRaw', NP_descrip, data, NP_ImVol, NP_OptChanRef, RGBW_channels=prefs)
+
+    nwbfile.add_acquisition(NP_image)
+
+    io = NWBHDF5IO('/Users/danielysprague/foco_lab/data/NP_nwb/'+worm+'.nwb', mode='w')
+    io.write(nwbfile)
+    io.close()
+
+def process_chaudhary(folder):
+
+    matfile = folder + '/Composite.mat'
+    csvfile = folder + '/mark_w_names.csv'
+
+    worm = folder[-1]
+
+    mat = sio.loadmat(matfile)
+
+    data = np.transpose(mat['data'], (1,0,2,3))
+
+    scale = np.asarray([0.33, 0.33, 1])
+    prefs = np.asarray(mat['prefs']['RGBW'][0][0]).flatten()-1 #subtract 1 to adjust for matlab indexing from 1
+
+    session_start = datetime(2021,2,24, tzinfo=tz.gettz("US/Pacific")) #currently just using date of paper publication
+
+    experimenter = 'Chaudhary, Shivesh'
+    experiment_descrip = 'NeuroPAL whole-brain structural images'
+
+    nwbfile = gen_file('C. elegans head NeuroPAL', experimenter, experiment_descrip, worm, session_start, 'Lu Lab', 'Georgia Tech University', ["Graphical-model framework for automated annotation of cell identities in dense cellular images"])
+
+    subject_description = 'NeuroPAL worm in microfluidic chip'
+    dob = session_start - timedelta(days=2)
+    growth_stage = 'YA'
+    gs_time = None
+    cultivation_temp = 20.
+    sex = "O"
+    strain = "OH15495"
+
+    nwbfile = create_subject(nwbfile, subject_description, worm, dob, growth_stage, gs_time, cultivation_temp, sex, strain)
+
+    microname = "Spinning disk confocal"
+    microdescrip = "Perkin Elmer spinning disk confocal microscope 40x Objective, oil objective with an EMCCD camera"
+    manufacturer = "Perkin Elmer"
+
+    device = create_device(nwbfile, microname, microdescrip, manufacturer)
+
+    channels = [("mNeptune 2.5", "Semrock FF01-731/137-25 Brightline","561-731-70m"), ("CyOFP1", "Semrock FF02-617/73-25 Brightline", "488-610-40m"), ("mTagBFP2", "Semrock FF01-445/45-25 Brightline", "405-445-45m"), ("Tag RFP-T", "Semrock FF02-617/73-25 Brightline", "561-610-40m")]
+
+    NP_ImVol, NP_OptChanRef = create_im_vol(nwbfile, 'NeuroPALImVol', device, 'NeuroPAL image of C. elegans brain', channels, grid_spacing=scale)
+
+    csv = pd.read_csv(csvfile)
+
+    blobs = csv[['##x', 'y', 'z', 'ID']]
+    blobs = blobs.rename(columns={'##x':'X', 'y':'Y', 'z':'Z', 'ID':'ID'})
+    blobs['X'] = round(blobs['X'])
+    blobs['Y'] = round(blobs['Y'])
+    blobs['Z'] = round(blobs['Z'])
+    blobs = blobs.astype({'X':'uint16', 'Y':'uint16', 'Z':'uint16'})
+    pos = np.asarray(blobs[['X', 'Y', 'Z']])
+    IDs = blobs['ID']
+    labels = IDs.replace(np.nan, '', regex=True)
+    labels = list(np.asarray(labels))
+
+    vs_descrip = 'Neuron centers for multichannel volumetric image. Weight set at 1 for all voxels. Labels refers to cell ID of segmented neurons.'
+
+    NeuroPALImSeg = ImageSegmentation(
+        name = 'NeuroPALSegmentation',
+        plane_segmentations = create_vol_seg_centers('NeuroPALNeurons', vs_descrip, NP_ImVol, pos, labels)
+    )
+
+    neuroPAL_module = nwbfile.create_processing_module(
+        name = 'NeuroPAL',
+        description = 'NeuroPAL image data and metadata'
+    )
+
+    neuroPAL_module.add(NeuroPALImSeg)
+    neuroPAL_module.add(NP_OptChanRef)
+
+    NP_descrip = 'NeuroPAL structural image'
+
+    NP_image = create_image('NeuroPALImageRaw', NP_descrip, data, NP_ImVol, NP_OptChanRef, RGBW_channels=prefs)
+
+    nwbfile.add_acquisition(NP_image)
+
+    io = NWBHDF5IO('/Users/danielysprague/foco_lab/data/NWB_Chaudhary/'+worm+'.nwb', mode='w')
+    io.write(nwbfile)
+    io.close()
+
+    return
+
 if __name__ == '__main__':
     datapath = '/Users/danielysprague/foco_lab/data'
 
@@ -747,7 +909,7 @@ if __name__ == '__main__':
         process_yemini(datapath + '/Yemini_21/OH16230/Heads/'+folder)
         t1 = time.time()
         print(t1-t0)
-    '''
+
 
     for folder in os.listdir(datapath+'/NP_FOCO_cropped'):
         if folder == '.DS_Store':
@@ -755,3 +917,17 @@ if __name__ == '__main__':
         strain = 'OH16230'
 
         process_NP_FOCO_original(datapath, folder, strain)
+    
+        
+    for file in os.listdir(datapath+'/NP_paper/all'):
+        if file[-4:] == '.mat' and file[-6:]!='ID.mat':
+            print(file)
+            process_Yem_original(file)
+
+    '''
+
+    for folder in os.listdir(datapath+ '/NP_chaudhary'):
+        print(folder)
+        if folder == '.DS_Store':
+            continue
+        process_chaudhary(datapath+ '/NP_chaudhary/'+ folder)
