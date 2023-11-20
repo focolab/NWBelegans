@@ -5,7 +5,9 @@ import numpy as np
 import pandas as pd
 from pynwb import load_namespaces, get_class, register_class, NWBFile, TimeSeries, NWBHDF5IO
 from sklearn.neighbors import NearestNeighbors
-
+from dandi.dandiapi import DandiAPIClient
+import remfile
+import h5py
 
 
 def get_nwb_neurons(filepath):
@@ -48,6 +50,47 @@ def get_dataset_neurons(folder):
         dataset[file[:-4]] = blobs
 
     return dataset
+
+def get_dataset_online(dandi_id):
+    dataset = {} 
+    with DandiAPIClient() as client:
+        dandiset = client.get_dandiset(dandi_id, 'draft')
+        for asset in dandiset.get_assets():
+            s3_url = asset.get_content_url(follow_redirects=1, strip_query=True)
+            file = remfile.File(s3_url)
+
+            with h5py.File(file, 'r') as f:
+                with NWBHDF5IO(file=f, mode='r', load_namespaces=True) as io:
+
+                    read_nwb = io.read()
+                    identifier = read_nwb.identifier
+                    seg = read_nwb.processing['NeuroPAL']['NeuroPALSegmentation']['NeuroPALNeurons'].voxel_mask[:]
+                    labels = read_nwb.processing['NeuroPAL']['NeuroPALSegmentation']['NeuroPALNeurons']['ID_labels'][:]
+                    channels = read_nwb.acquisition['NeuroPALImageRaw'].RGBW_channels[:] #get which channels of the image correspond to which RGBW pseudocolors
+                    image = read_nwb.acquisition['NeuroPALImageRaw'].data[:]
+                    scale = read_nwb.imaging_planes['NeuroPALImVol'].grid_spacing[:] #get which channels of the image correspond to which RGBW pseudocolors
+
+                labels = ["".join(label) for label in labels]
+
+                labels = [label[:-1] if label.endswith('?') else label for label in labels]
+
+                blobs = pd.DataFrame.from_records(seg, columns = ['X', 'Y', 'Z', 'weight'])
+                blobs = blobs.drop(['weight'], axis=1)
+
+                RGB_channels = channels[:-1]
+                RGB = image[:,:,:,RGB_channels]
+
+                blobs[['R','G','B']] = [RGB[row['x'],row['y'],row['z'],:] for i, row in blobs.iterrows()]
+                blobs[['xr', 'yr', 'zr']] = [[row['x']*scale[0],row['y']*scale[1], row['z']*scale[2]] for i, row in blobs.iterrows()]
+                blobs['ID'] = labels
+
+                blobs = blobs.replace('nan', np.nan, regex=True) 
+
+                dataset[identifier] = blobs
+
+    return dataset
+
+
 
 
 def combine_datasets(datasets):

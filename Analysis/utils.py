@@ -127,3 +127,43 @@ def get_cumul_acc(df):
     per_corr_4 = len(corr_cum_4.index)/len(IDd.index)
 
     return IDd, per_ID, [per_corr_1, per_corr_2, per_corr_3, per_corr_4]
+
+def run_linear_assignment(df_data, atlas):
+    #df_data should have columns 'X', 'Y', 'Z', 'R', 'G', 'B', 'ID' 
+
+    df_assigns = df_data.copy()
+
+    mu = atlas.mu
+    sigma = atlas.sigma
+    neurons = np.asarray(atlas.neurons)
+
+    xyzrgb = np.asarray(df_data[['X','Y','Z','R','G','B']])
+    gt_labels = np.asarray(df_data['ID'])
+
+    assigns = np.empty((xyzrgb.shape[0],5),np.dtype('U100'))
+
+    cost_mat = np.zeros((xyzrgb.shape[0], mu.shape[0]))
+
+    for i in range(xyzrgb.shape[0]):
+        for j in range(mu.shape[0]):
+            cost = maha_dist(xyzrgb[i,:], mu[j,:], sigma[:,:,j])
+
+            cost_mat[i,j] = cost
+
+    for k in range(5):
+
+        row_inds, col_inds = scipy.optimize.linear_sum_assignment(cost_mat)
+
+        assigns[row_inds,k] = np.asarray(neurons[col_inds])
+
+        cost_mat[row_inds, col_inds] = np.inf
+
+    #figure out case where more rows than columns 
+
+    df_assigns['assign_1'] = assigns[:,0]
+    df_assigns['assign_2'] = assigns[:,1]
+    df_assigns['assign_3'] = assigns[:,2]
+    df_assigns['assign_4'] = assigns[:,3]
+    df_assigns['assign_5'] = assigns[:,4]
+
+    return df_assigns

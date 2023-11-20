@@ -4,7 +4,7 @@ import pandas as pd
 import seaborn as sns
 from matplotlib.patches import Ellipse
 import matplotlib.transforms as transforms
-from utils import covar_to_coord
+from utils import covar_to_coord, convert_coordinates
 from stats import get_accuracy
 
 
@@ -309,3 +309,239 @@ def plot_accuracies(datasets, csv_folders, labels, LR=False, atlas=None, title =
     plt.show()
 
     return df
+
+def plot_visualizations_atlas(atlas):
+
+    fig = plt.figure()
+    fig.set_figheight(6)
+    fig.set_figwidth(10)
+
+    ax1 = plt.subplot2grid(shape=(3,5), loc=(0,0), colspan=2, rowspan=3)
+    ax2 = plt.subplot2grid(shape=(3,5), loc =(0,2), colspan=1, rowspan=1)
+    ax3 = plt.subplot2grid(shape=(3,5), loc=(0,3), colspan=1, rowspan=1)
+    ax4 = plt.subplot2grid(shape=(3,5), loc=(0,4), colspan=1, rowspan=1)
+    ax5 = plt.subplot2grid(shape=(3,5), loc=(1,2), colspan=3,rowspan=1)
+    ax6 = plt.subplot2grid(shape=(3,5), loc=(2,2), colspan=3, rowspan=1)
+
+    axs = [ax1, ax2, ax3, ax4, ax5, ax6]
+
+    atlas_df = atlas.get_df(vRecenter=[60, 10, -10])
+
+    atlas_df = atlas_df.sort_values(by=['ID'], ignore_index=True)
+
+    ganglia = sorted(atlas_df['ganglion'].unique())
+
+    for g in ganglia:
+        dfg = atlas_df[atlas_df['ganglion'] == g]
+        axs[0].plot(dfg['theta'], dfg['h'], 'o', lw=0, label=g, markerfacecolor='None')
+
+    axs[0].axvspan(-135, -45, edgecolor=None, color='lightgrey', alpha=0.4, zorder=0, lw=0)
+    axs[0].axvspan(45, 135, edgecolor=None, color='lightgrey', alpha=0.4, zorder=0, lw=0)
+    axs[0].axvline(-180, ls='--', color='grey')
+    axs[0].axvline(180, ls='--', color='grey')
+    axs[0].set_xlabel('theta')
+    axs[0].set_ylabel('Distance along AP axis')
+    #axs[0].legend()
+
+    neur_dict = atlas.create_dictionary()
+
+    xyz_sigma = atlas.xyzsigma
+    rgb_sigma = atlas.rgbsigma
+
+    xyz_mu = atlas.xyzmu
+    rgb_mu = atlas.rgbmu
+
+    for ax in axs[1:4]:
+        ax.set_aspect('equal')
+        ax.set_xlim(-10, 30)
+        ax.set_ylim(-10, 30)
+
+    for n in range(rgb_sigma.shape[2]):
+        
+        rgl1, rgl2, rgtheta = covar_to_coord(rgb_sigma[[0,1],:,n][:,[0,1]])
+        rbl1, rbl2, rbtheta = covar_to_coord(rgb_sigma[[0,2],:,n][:,[0,2]])
+        gbl1, gbl2, gbtheta = covar_to_coord(rgb_sigma[[1,2],:,n][:,[1,2]])
+
+        rmu = rgb_mu[n, 0]
+        gmu = rgb_mu[n, 1]
+        bmu = rgb_mu[n, 2]
+        
+        #looking at only half a std to make it easier to visualize 
+        rg_ellipse = Ellipse((rmu,gmu), width =rgl1*2, height = rgl2*2, angle=rgtheta*180/np.pi, alpha=0.05, edgecolor='orange', facecolor='orange')
+        axs[1].add_patch(rg_ellipse)
+        rb_ellipse = Ellipse((rmu, bmu), width =rbl1*2, height = rbl2*2, angle=rbtheta*180/np.pi, alpha=0.05, edgecolor='magenta', facecolor='magenta')
+        axs[2].add_patch(rb_ellipse)
+        gb_ellipse = Ellipse((gmu, bmu), width =gbl1*2, height = gbl2*2, angle=gbtheta*180/np.pi, alpha=0.05, edgecolor='cyan', facecolor='cyan')
+        axs[3].add_patch(gb_ellipse)
+
+    axs[1].set_title('red-green')
+    axs[1].set_xlabel('red')
+    axs[1].set_ylabel('green')
+    axs[2].set_title('red-blue')
+    axs[2].set_xlabel('red')
+    axs[2].set_ylabel('blue')
+    axs[3].set_title('green-blue')
+    axs[3].set_xlabel('green')
+    axs[3].set_ylabel('blue')
+
+    for i in range(xyz_sigma.shape[2]):
+        atlas.draw_ellipse(xyz_mu[i,[0,1]],xyz_sigma[0:2,0:2,i],atlas.atlas_color[i,:3], std_devs=1.5, ax=axs[5],line_width=2)
+        atlas.draw_ellipse(xyz_mu[i,[0,2]],xyz_sigma[[0,2],:,i][:,[0,2]],atlas.atlas_color[i,:3], std_devs = 1.5, ax=axs[4],line_width=2)
+  
+    axs[4].set_aspect('equal')
+    axs[4].grid()
+    axs[4].set_ylabel('Z')
+    #axs[4].set_ylim((-15,15))
+    axs[4].invert_yaxis()
+    #axs[4].set_xlim((-80,120))
+    axs[4].autoscale_view()
+
+    axs[5].set_aspect('equal')
+    axs[5].grid()
+    axs[5].set_xlabel('X')
+    axs[5].set_ylabel('Y')
+    #axs[5].set_ylim((-15,15))
+    #axs[5].set_xlim((-80,120))
+    axs[5].autoscale_view()
+
+    plt.tight_layout()
+
+    plt.show()
+
+def plot_visualizations_data(df_data, atlas, vRecenter = [0,0,0]):
+
+    #df_data should contain Z-scored RGB data as well as positions 
+
+    xyz = np.asarray(df_data[['X','Y','Z']])
+
+    xyz = atlas.project_atlas_components(xyz)
+
+    df_data['X'] = xyz[:,0]
+    df_data['Y'] = xyz[:,1]
+    df_data['Z'] = xyz[:,2]
+
+    df_data = convert_coordinates(df_data, vRecenter=vRecenter)
+
+    rgb_data = np.asarray(df_data[['R', 'G', 'B']])
+
+    marker_size = 10
+
+    colors_min = np.amin(rgb_data, axis=0)
+    colors_max = np.amax(rgb_data, axis=0)
+    color_norm = np.divide(rgb_data-colors_min, colors_max-colors_min)
+
+    fig = plt.figure()
+    fig.set_figheight(6)
+    fig.set_figwidth(10)
+
+    ax1 = plt.subplot2grid(shape=(3,5), loc=(0,0), colspan=2, rowspan=3)
+    ax2 = plt.subplot2grid(shape=(3,5), loc =(0,2), colspan=1, rowspan=1)
+    ax3 = plt.subplot2grid(shape=(3,5), loc=(0,3), colspan=1, rowspan=1)
+    ax4 = plt.subplot2grid(shape=(3,5), loc=(0,4), colspan=1, rowspan=1)
+    ax5 = plt.subplot2grid(shape=(3,5), loc=(1,2), colspan=3,rowspan=1)
+    ax6 = plt.subplot2grid(shape=(3,5), loc=(2,2), colspan=3, rowspan=1)
+
+    axs = [ax1, ax2, ax3, ax4, ax5, ax6]
+
+    axs[0].scatter(df_data['theta'], df_data['h'], c=color_norm, s=marker_size)
+
+    axs[0].axvspan(-135, -45, edgecolor=None, color='lightgrey', alpha=0.4, zorder=0, lw=0)
+    axs[0].axvspan(45, 135, edgecolor=None, color='lightgrey', alpha=0.4, zorder=0, lw=0)
+    axs[0].axvline(-180, ls='--', color='grey')
+    axs[0].axvline(180, ls='--', color='grey')
+    axs[0].set_xlabel('theta')
+    axs[0].set_ylabel('Distance along AP axis')
+    axs[0].legend()
+
+    for ax in axs[1:4]:
+        ax.set_aspect('equal')
+        ax.set_xlim(-10, 30)
+        ax.set_ylim(-10, 30)
+
+    colors_min = np.amin(rgb_data, axis=0)
+    colors_max = np.amax(rgb_data, axis=0)
+    color_norm = np.divide(rgb_data-colors_min, colors_max-colors_min)
+    
+    axs[1].scatter(rgb_data[:,0], rgb_data[:,1], c=color_norm, s=marker_size)
+    axs[2].scatter(rgb_data[:,0], rgb_data[:,2], c=color_norm, s=marker_size)
+    axs[3].scatter(rgb_data[:,1], rgb_data[:,2], c=color_norm, s=marker_size)
+
+    axs[1].set_title('red-green')
+    axs[1].set_xlabel('red')
+    axs[1].set_ylabel('green')
+    axs[2].set_title('red-blue')
+    axs[2].set_xlabel('red')
+    axs[2].set_ylabel('blue')
+    axs[3].set_title('green-blue')
+    axs[3].set_xlabel('green')
+    axs[3].set_ylabel('blue')
+
+    axs[4].scatter(df_data['X'], df_data['Z'], c=color_norm, s=marker_size)
+    axs[5].scatter(df_data['X'], df_data['Y'], c=color_norm, s=marker_size)
+  
+    axs[4].set_aspect('equal')
+    axs[4].grid()
+    axs[4].set_ylabel('Z')
+    #axs[4].set_ylim((-15,15))
+    axs[4].invert_yaxis()
+    #axs[4].set_xlim((-80,120))
+    axs[4].autoscale_view()
+
+    axs[5].set_aspect('equal')
+    axs[5].grid()
+    axs[5].set_xlabel('X')
+    axs[5].set_ylabel('Y')
+    #axs[5].set_ylim((-15,15))
+    #axs[5].set_xlim((-80,120))
+    axs[5].autoscale_view()
+
+    plt.tight_layout()
+
+    plt.show()
+
+def plot_atlas2d_super(df_data, atlas):
+    '''
+    Plot dataset point cloud super-imposed onto atlas with both XY and XZ projections
+    '''
+
+
+    df = df_data.copy()
+
+    fig, axs = plt.subplots(2,1)
+
+    xyz_sigma = atlas.xyzsigma
+    rgb_sigma = atlas.rgbsigma
+
+    xyz_mu = atlas.xyzmu
+    rgb_mu = atlas.rgbmu
+
+    data_xyz = np.asarray(df_data[['X','Y','Z']])
+
+    data_xyz = atlas.project_atlas_components(data_xyz)
+
+    marker_size = 5
+
+    for i in range(xyz_sigma.shape[2]):
+        atlas.draw_ellipse(xyz_mu[i,[0,1]],xyz_sigma[0:2,0:2,i],atlas.atlas_color[i,:3], std_devs=1.5, ax=axs[1],line_width=1)
+        atlas.draw_ellipse(xyz_mu[i,[0,2]],xyz_sigma[[0,2],:,i][:,[0,2]],atlas.atlas_color[i,:3], std_devs = 1.5, ax=axs[0],line_width=1)
+    
+    axs[0].scatter(data_xyz[:,0], data_xyz[:,2],  s=marker_size)
+    axs[1].scatter(data_xyz[:,0], data_xyz[:,1],  s=marker_size)
+  
+    axs[0].set_aspect('equal')
+    axs[0].grid()
+    axs[0].set_ylabel('Z')
+    #axs[4].set_ylim((-15,15))
+    axs[0].invert_yaxis()
+    #axs[4].set_xlim((-80,120))
+    axs[0].autoscale_view()
+
+    axs[1].set_aspect('equal')
+    axs[1].grid()
+    axs[1].set_xlabel('X')
+    axs[1].set_ylabel('Y')
+    #axs[5].set_ylim((-15,15))
+    #axs[5].set_xlim((-80,120))
+    axs[1].autoscale_view()
+
+    plt.show()
