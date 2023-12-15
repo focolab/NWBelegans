@@ -77,7 +77,7 @@ class NPAtlas:
         self.sigma = np.asarray(sigma)
         self.neurons = neurons
         self.neur_dict = {}
-        self.df = None
+        self.df = self.get_df()
 
     def create_dictionary(self):
         '''
@@ -200,7 +200,7 @@ class NWBAtlas:
         
         self.neurons = neurons
         self.neur_dict = {}
-        self. df = None
+        self.df = self.get_df()
             
         #if plot_cov:
         #    for i in range(cov.shape[2]):

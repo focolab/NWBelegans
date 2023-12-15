@@ -410,7 +410,7 @@ def plot_visualizations_atlas(atlas):
 
 def plot_visualizations_data(df_data, atlas, vRecenter = [0,0,0]):
 
-    #df_data should contain Z-scored RGB data as well as positions 
+    #df_data should cont-ain Z-scored RGB data as well as positions 
 
     xyz = np.asarray(df_data[['X','Y','Z']])
 
@@ -449,6 +449,7 @@ def plot_visualizations_data(df_data, atlas, vRecenter = [0,0,0]):
     axs[0].axvspan(45, 135, edgecolor=None, color='lightgrey', alpha=0.4, zorder=0, lw=0)
     axs[0].axvline(-180, ls='--', color='grey')
     axs[0].axvline(180, ls='--', color='grey')
+    axs[0].set_ylim((-125,100))
     axs[0].set_xlabel('theta')
     axs[0].set_ylabel('Distance along AP axis')
     axs[0].legend()
@@ -482,17 +483,17 @@ def plot_visualizations_data(df_data, atlas, vRecenter = [0,0,0]):
     axs[4].set_aspect('equal')
     axs[4].grid()
     axs[4].set_ylabel('Z')
-    #axs[4].set_ylim((-15,15))
     axs[4].invert_yaxis()
-    #axs[4].set_xlim((-80,120))
+    axs[4].set_ylim((5,-30))
+    axs[4].set_xlim((-5,170))
     axs[4].autoscale_view()
 
     axs[5].set_aspect('equal')
     axs[5].grid()
     axs[5].set_xlabel('X')
     axs[5].set_ylabel('Y')
-    #axs[5].set_ylim((-15,15))
-    #axs[5].set_xlim((-80,120))
+    axs[5].set_ylim((-5,25))
+    axs[5].set_xlim((-5,170))
     axs[5].autoscale_view()
 
     plt.tight_layout()
