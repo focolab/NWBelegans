@@ -89,7 +89,7 @@ def create_im_vol(nwbfile, name, device, description, channels, location="head",
         OptChanRefData.append(wave)
 
     OptChanRefs = OpticalChannelReferences(
-        name = 'OpticalChannelRefs',
+        name = 'order_optical_channels',
         channels = OptChanRefData
     )
 
@@ -513,7 +513,6 @@ def process_NP_FOCO_Ray(datapath, dataset, strain, calc=False):
     )
 
     neuroPAL_module.add(NeuroPALImSeg)
-    neuroPAL_module.add(NP_OptChanRef)
 
     Proc_descrip = 'Processed NeuroPAL image'
 
@@ -532,7 +531,6 @@ def process_NP_FOCO_Ray(datapath, dataset, strain, calc=False):
     )
 
     processed_im_module.add(Proc_image)
-    processed_im_module.add(Proc_OptChanRef)
 
     if calc:
         GCaMP_chan = [("GFP-GCaMP", "Chroma ET 525/50","488-525-50m")]
@@ -650,10 +648,9 @@ def process_NP_FOCO_Ray(datapath, dataset, strain, calc=False):
 
         calcium_im_module.add(CalcImSeg)
         calcium_im_module.add(SignalFluor)
-        calcium_im_module.add(Calc_OptChanRef)
         calcium_im_module.add(Calclabels)
 
-    io = NWBHDF5IO(datapath + '/NWB_Ray/'+identifier+'.nwb', mode='w')
+    io = NWBHDF5IO(datapath + '/NWB_test/'+identifier+'.nwb', mode='w')
     io.write(nwbfile)
     io.close()
 
@@ -1065,6 +1062,7 @@ if __name__ == '__main__':
             process_NP_FOCO_Ray(datapath, folder, strain)
         t1 = time.time()
         print(t1-t0)
+        break
     
     '''
     for folder in os.listdir(datapath+'/Yemini_21/OH16230/Heads'):

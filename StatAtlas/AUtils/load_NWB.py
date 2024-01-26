@@ -26,7 +26,7 @@ def load_NWB(datapath, folders, bodypart='head'):
 
     for folder in folders:
         if folder.split(':')[0] == 'dandi': #if accessing from Dandi folder
-            dandi_id = '000692'
+            dandi_id = folder.split(':')[1]
             with DandiAPIClient() as client:
                 dandiset = client.get_dandiset(dandi_id, 'draft')
                 for asset in dandiset.get_assets():

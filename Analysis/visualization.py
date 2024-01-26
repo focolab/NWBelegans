@@ -6,6 +6,8 @@ from matplotlib.patches import Ellipse
 import matplotlib.transforms as transforms
 from utils import covar_to_coord, convert_coordinates
 from stats import get_accuracy
+from adjustText import adjust_text
+from matplotlib.lines import Line2D
 
 
 def plot_summary_stats(segs, IDs, labels):
@@ -103,29 +105,48 @@ def plot_num_heatmap(num_heatmap, df_ganglia):
     plt.tick_params(which='both', bottom=False, left=False,labelbottom=False, labelleft=False)  # Hide tick labels
     plt.show()
 
-def plot_atlas_unrolled(df):
+def plot_atlas_unrolled(atlas):
     """df needs: x/y/zcyl, ganglion, h, theta """
 
-    ganglia = sorted(df['ganglion'].unique())
-    gs_kw = dict(height_ratios=[1, 4])
-    fig, ax = plt.subplots(ncols=1, nrows=2, figsize=(6, 12), gridspec_kw=gs_kw)
+    fig = plt.figure()
+    fig.set_figheight(10)
+    fig.set_figwidth(6)
+
+    ax1 = plt.subplot2grid(shape=(10,6), loc=(0,0), colspan=6, rowspan=10)
+    atlas_df = atlas.get_df(vRecenter=[60, 10, -10])
+
+    atlas_df = atlas_df.sort_values(by=['ID'], ignore_index=True)
+
+    ganglia = sorted(atlas_df['ganglion'].unique())
 
     for g in ganglia:
-        dfg = df[df['ganglion'] == g]
-        ax[0].plot(dfg['ycyl'], dfg['zcyl'], 'o', lw=0,markerfacecolor='None')
-        ax[1].plot(dfg['theta'], dfg['h'], 'o', lw=0, label=g, markerfacecolor='None')
+        dfg = atlas_df[atlas_df['ganglion'] == g]
+        ax1.plot(dfg['theta'], dfg['h'], 'o', lw=0, label=g, markerfacecolor='None')
 
-    ax[0].set_aspect('equal')
-    ax[0].set_xlim([-4, 4])
-    ax[0].set_ylim([-4, 4])
-    ax[0].plot([0, 0], [0, 2.5], '--', color='grey')
-    ax[0].plot(0, 0, 'x', color='k')
+    ax1.axvspan(-135, -45, edgecolor=None, color='lightgrey', alpha=0.4, zorder=0, lw=0)
+    ax1.axvspan(45, 135, edgecolor=None, color='lightgrey', alpha=0.4, zorder=0, lw=0)
+    ax1.axvline(-180, ls='--', color='grey')
+    ax1.axvline(180, ls='--', color='grey')
+    ax1.set_xlabel('theta')
+    ax1.set_ylabel('Distance along AP axis')
+    ax1.legend(fontsize=10)
 
-    ax[1].axvspan(-135, -45, edgecolor=None, color='lightgrey', alpha=0.4, zorder=0, lw=0)
-    ax[1].axvspan(45, 135, edgecolor=None, color='lightgrey', alpha=0.4, zorder=0, lw=0)
-    ax[1].axvline(-180, ls='--', color='grey')
-    ax[1].axvline(180, ls='--', color='grey')
-    ax[1].legend()
+    TEXTS = []
+    for i, row in atlas_df.iterrows():
+        x = row['theta']
+        y = row['h']
+        TEXTS.append(ax1.text(x,y, row['ID'], fontsize=8))
+
+    adjust_text(
+        TEXTS,
+        arrowprops = dict(arrowstyle="-"),
+        time_lim = 5,
+        force_text = (0.3,0.3),
+        ensure_inside_axes = False,
+        expand_axes = True,
+        ax=ax1
+    )
+
 
     plt.tight_layout()
     plt.show()
@@ -312,6 +333,8 @@ def plot_accuracies(datasets, csv_folders, labels, LR=False, atlas=None, title =
 
 def plot_visualizations_atlas(atlas):
 
+    plt.rcParams.update({'font.size': 16})
+
     fig = plt.figure()
     fig.set_figheight(6)
     fig.set_figwidth(10)
@@ -341,7 +364,24 @@ def plot_visualizations_atlas(atlas):
     axs[0].axvline(180, ls='--', color='grey')
     axs[0].set_xlabel('theta')
     axs[0].set_ylabel('Distance along AP axis')
-    #axs[0].legend()
+    axs[0].legend(fontsize=10)
+
+    TEXTS = []
+    for i, row in atlas_df.iterrows():
+        x = row['theta']
+        y = row['h']
+        TEXTS.append(axs[0].text(x,y, row['ID'], fontsize=8))
+
+    adjust_text(
+        TEXTS,
+        arrowprops = dict(arrowstyle="-"),
+        time_lim = 5,
+        force_text = (0.3,0.3),
+        ensure_inside_axes = False,
+        expand_axes = True,
+        ax=axs[0]
+    )
+
 
     neur_dict = atlas.create_dictionary()
 
@@ -404,6 +444,9 @@ def plot_visualizations_atlas(atlas):
     #axs[5].set_xlim((-80,120))
     axs[5].autoscale_view()
 
+    axs[4].grid(False)
+    axs[5].grid(False)
+
     plt.tight_layout()
 
     plt.show()
@@ -430,6 +473,7 @@ def plot_visualizations_data(df_data, atlas, vRecenter = [0,0,0]):
     colors_max = np.amax(rgb_data, axis=0)
     color_norm = np.divide(rgb_data-colors_min, colors_max-colors_min)
 
+    sns.set_theme(style='white')
     fig = plt.figure()
     fig.set_figheight(6)
     fig.set_figwidth(10)
@@ -479,9 +523,10 @@ def plot_visualizations_data(df_data, atlas, vRecenter = [0,0,0]):
 
     axs[4].scatter(df_data['X'], df_data['Z'], c=color_norm, s=marker_size)
     axs[5].scatter(df_data['X'], df_data['Y'], c=color_norm, s=marker_size)
+    axs[4].grid(False)
+    axs[5].grid(False)
   
     axs[4].set_aspect('equal')
-    axs[4].grid()
     axs[4].set_ylabel('Z')
     axs[4].invert_yaxis()
     axs[4].set_ylim((5,-30))
@@ -489,7 +534,6 @@ def plot_visualizations_data(df_data, atlas, vRecenter = [0,0,0]):
     axs[4].autoscale_view()
 
     axs[5].set_aspect('equal')
-    axs[5].grid()
     axs[5].set_xlabel('X')
     axs[5].set_ylabel('Y')
     axs[5].set_ylim((-5,25))

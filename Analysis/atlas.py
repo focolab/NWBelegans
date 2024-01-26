@@ -227,7 +227,9 @@ class NWBAtlas:
 
             gang = gang_dict.get(neurClass, 'Other')
 
-            self.neur_dict[ID] = {'xyz_mu': self.xyzmu, 'rgb_mu': self.rgbmu, 'xyz_sigma':self.xyzsigma, 'rgb_sigma': self.rgbsigma, 'class':neurClass, 'ganglion':gang}
+            index = np.argwhere(self.neurons == ID)
+
+            self.neur_dict[ID] = {'xyz_mu': self.xyzmu[index,:], 'rgb_mu': self.rgbmu[index,:], 'xyz_sigma':self.xyzsigma[:,:,index], 'rgb_sigma': self.rgbsigma[:,:,index], 'class':neurClass, 'ganglion':gang}
 
         return self.neur_dict
 

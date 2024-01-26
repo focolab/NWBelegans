@@ -10,7 +10,7 @@ import remfile
 import h5py
 
 
-def get_nwb_neurons(filepath):
+def get_nwb_neurons(filepath, atlas_neurons):
     '''
     Take in path to NWB file and return dataframe containing labels, xyz positions, and RGB values
     '''
@@ -37,21 +37,23 @@ def get_nwb_neurons(filepath):
 
     blobs = blobs.replace('nan', np.nan, regex=True) 
 
+    blobs = blobs[blobs['ID'].isin(atlas_neurons)]
+
     return blobs, RGB
 
-def get_dataset_neurons(folder):
+def get_dataset_neurons(folder, atlas_neurons):
     dataset = {}
     for file in os.listdir(folder):
         if not file[-4:] =='.nwb':
             continue
 
-        blobs, image = get_nwb_neurons(folder+'/'+file)
+        blobs, image = get_nwb_neurons(folder+'/'+file, atlas_neurons)
 
         dataset[file[:-4]] = blobs
 
     return dataset
 
-def get_dataset_online(dandi_id):
+def get_dataset_online(dandi_id, atlas_neurons):
     dataset = {} 
     with DandiAPIClient() as client:
         dandiset = client.get_dandiset(dandi_id, 'draft')
@@ -85,6 +87,8 @@ def get_dataset_online(dandi_id):
                 blobs['ID'] = labels
 
                 blobs = blobs.replace('nan', np.nan, regex=True) 
+
+                blobs = blobs[blobs['ID'].isin(atlas_neurons)]
 
                 dataset[identifier] = blobs
 
