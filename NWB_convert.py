@@ -86,7 +86,7 @@ def create_im_vol(nwbfile, name, device, description, channels, location="head",
         )
 
         OptChannels.append(OptChan)
-        OptChanRefData.append(wave)
+        OptChanRefData.append(fluor)
 
     OptChanRefs = OpticalChannelReferences(
         name = 'order_optical_channels',
@@ -109,13 +109,12 @@ def create_im_vol(nwbfile, name, device, description, channels, location="head",
 
     nwbfile.add_imaging_plane(ImVol)
 
-    return ImVol, OptChanRefs
+    return ImVol
 
-def create_image(name, description, data, ImVol, OptChanRefs, RGBW_channels=[0,1,2,3]):
+def create_image(name, description, data, ImVol, RGBW_channels=[0,1,2,3]):
 
     image = MultiChannelVolume(
         name = name,
-        order_optical_channels = OptChanRefs,
         description = description,
         RGBW_channels = RGBW_channels,
         data = data,
@@ -251,7 +250,7 @@ def process_NP_FOCO_original(datapath,dataset, strain, calc = False):
 
     NP_descrip = 'NeuroPAL image of C. elegans brain'
 
-    NP_ImVol, NP_OptChanRef = create_im_vol(nwbfile, 'NeuroPALImVol', microscope, NP_descrip,channels, location="head", grid_spacing = scale)
+    NP_ImVol = create_im_vol(nwbfile, 'NeuroPALImVol', microscope, NP_descrip,channels, location="head", grid_spacing = scale)
 
     raw_file = datapath + '/NP_FOCO_cropped/' + dataset + '/neuropal_1_MMStack_Pos0.ome.tif'
     data = skio.imread(raw_file)
@@ -259,7 +258,7 @@ def process_NP_FOCO_original(datapath,dataset, strain, calc = False):
 
     ImDescrip = 'NeuroPAL structural image'
 
-    NP_image = create_image('NeuroPALImageRaw', ImDescrip, data, NP_ImVol, NP_OptChanRef, RGBW_channels=RGBW_channels)
+    NP_image = create_image('NeuroPALImageRaw', ImDescrip, data, NP_ImVol, RGBW_channels=RGBW_channels)
 
     nwbfile.add_acquisition(NP_image)
 
@@ -284,11 +283,10 @@ def process_NP_FOCO_original(datapath,dataset, strain, calc = False):
     )
 
     neuroPAL_module.add(NeuroPALImSeg)
-    neuroPAL_module.add(NP_OptChanRef)
 
     Proc_descrip = 'Processed NeuroPAL image'
 
-    Proc_ImVol, Proc_OptChanRef = create_im_vol(nwbfile, 'ProcessedImVol', microscope, Proc_descrip,[channels[i] for i in RGBW_channels])
+    Proc_ImVol = create_im_vol(nwbfile, 'ProcessedImVol', microscope, Proc_descrip,[channels[i] for i in RGBW_channels])
 
     if not os.path.exists(datapath+ '/NP_FOCO_hist_match/' + dataset + '/hist_match_image.tif'):
         proc_mat = datapath+ '/NP_FOCO_hist_match/' + dataset + '/hist_match_image.mat'
@@ -304,7 +302,7 @@ def process_NP_FOCO_original(datapath,dataset, strain, calc = False):
 
     ProcDescrip = 'NeuroPAL image with median filtering followed by color histogram matching to reference NeuroPAL images'
 
-    Proc_image = create_image('ProcessedImage', ProcDescrip, proc_data, Proc_ImVol, Proc_OptChanRef, RGBW_channels=[0,1,2,3])
+    Proc_image = create_image('ProcessedImage', ProcDescrip, proc_data, Proc_ImVol, RGBW_channels=[0,1,2,3])
 
     processed_im_module = nwbfile.create_processing_module(
         name = 'ProcessedImage',
@@ -312,7 +310,6 @@ def process_NP_FOCO_original(datapath,dataset, strain, calc = False):
     )
 
     processed_im_module.add(Proc_image)
-    processed_im_module.add(Proc_OptChanRef)
 
     if calc:
 
@@ -322,7 +319,7 @@ def process_NP_FOCO_original(datapath,dataset, strain, calc = False):
 
         Calc_descrip = 'Imaging volume used to acquire calcium imaging data'
 
-        Calc_ImVol, Calc_OptChanRef = create_im_vol(nwbfile, 'CalciumImVol', microscope, Calc_descrip, GCaMP_chan, grid_spacing=Calc_scale)
+        Calc_ImVol = create_im_vol(nwbfile, 'CalciumImVol', microscope, Calc_descrip, GCaMP_chan, grid_spacing=Calc_scale)
 
         Calc_file = datapath + '/NP_FOCO_cropped/' + dataset +'/' +dataset+'.tiff'
 
@@ -428,11 +425,10 @@ def process_NP_FOCO_original(datapath,dataset, strain, calc = False):
 
         calcium_im_module.add(CalcImSeg)
         calcium_im_module.add(SignalFluor)
-        calcium_im_module.add(Calc_OptChanRef)
         calcium_im_module.add(Calclabels)
 
 
-    io = NWBHDF5IO(datapath + '/NWB_foco/'+identifier+'.nwb', mode='w')
+    io = NWBHDF5IO(datapath + '/final_nwb/SK2/'+identifier+'.nwb', mode='w')
     io.write(nwbfile)
     io.close()
 
@@ -480,7 +476,7 @@ def process_NP_FOCO_Ray(datapath, dataset, strain, calc=False):
 
     NP_descrip = 'NeuroPAL image of C. elegans brain'
 
-    NP_ImVol, NP_OptChanRef = create_im_vol(nwbfile, 'NeuroPALImVol', microscope, NP_descrip,channels, location="head", grid_spacing = scale)
+    NP_ImVol = create_im_vol(nwbfile, 'NeuroPALImVol', microscope, NP_descrip,channels, location="head", grid_spacing = scale)
 
     raw_file = datapath + '/NP_Ray/' + dataset + '/full_comp.tif'
     data = skio.imread(raw_file)
@@ -488,7 +484,7 @@ def process_NP_FOCO_Ray(datapath, dataset, strain, calc=False):
 
     ImDescrip = 'NeuroPAL structural image'
 
-    NP_image = create_image('NeuroPALImageRaw', ImDescrip, data, NP_ImVol, NP_OptChanRef, RGBW_channels=RGBW_channels)
+    NP_image = create_image('NeuroPALImageRaw', ImDescrip, data, NP_ImVol, RGBW_channels=RGBW_channels)
 
     nwbfile.add_acquisition(NP_image)
 
@@ -516,14 +512,14 @@ def process_NP_FOCO_Ray(datapath, dataset, strain, calc=False):
 
     Proc_descrip = 'Processed NeuroPAL image'
 
-    Proc_ImVol, Proc_OptChanRef = create_im_vol(nwbfile, 'ProcessedImVol', microscope, Proc_descrip,[channels[i] for i in RGBW_channels])
+    Proc_ImVol = create_im_vol(nwbfile, 'ProcessedImVol', microscope, Proc_descrip,[channels[i] for i in RGBW_channels])
 
     proc_file = datapath+ '/manual_annotate/' + dataset + '/neuroPAL_image.tif'
     proc_data = np.transpose(skio.imread(proc_file), [2,1,0,3])
 
     ProcDescrip = 'NeuroPAL image with median filtering followed by color histogram matching to reference NeuroPAL images'
 
-    Proc_image = create_image('ProcessedImage', ProcDescrip, proc_data, Proc_ImVol, Proc_OptChanRef, RGBW_channels=[0,1,2,3])
+    Proc_image = create_image('ProcessedImage', ProcDescrip, proc_data, Proc_ImVol, RGBW_channels=[0,1,2,3])
 
     processed_im_module = nwbfile.create_processing_module(
         name = 'ProcessedImage',
@@ -542,7 +538,7 @@ def process_NP_FOCO_Ray(datapath, dataset, strain, calc=False):
 
         Calc_descrip = 'Imaging volume used to acquire calcium imaging data'
 
-        Calc_ImVol, Calc_OptChanRef = create_im_vol(nwbfile, 'CalciumImVol', microscope, Calc_descrip, GCaMP_chan, grid_spacing=Calc_scale)
+        Calc_ImVol = create_im_vol(nwbfile, 'CalciumImVol', microscope, Calc_descrip, GCaMP_chan, grid_spacing=Calc_scale)
 
         Calc_file = datapath + '/NP_Ray/' + dataset +'/' +dataset+'.tiff'
 
@@ -650,7 +646,7 @@ def process_NP_FOCO_Ray(datapath, dataset, strain, calc=False):
         calcium_im_module.add(SignalFluor)
         calcium_im_module.add(Calclabels)
 
-    io = NWBHDF5IO(datapath + '/NWB_test/'+identifier+'.nwb', mode='w')
+    io = NWBHDF5IO(datapath + '/final_nwb/SK1/'+identifier+'.nwb', mode='w')
     io.write(nwbfile)
     io.close()
 
@@ -719,7 +715,7 @@ def process_yemini(folder):
     elif prefs[3]==3:
         channels = [("mTagBFP2", "Semrock FF01-445/45-25 Brightline", "405-445-25m"), ("CyOFP1", "Semrock FF02-617/73-25 Brightline","488-610-40m"), ("mNeptune 2.5", "Semrock FF01-731/137-25 Brightline","561-731-70m"), ("Tag RFP-T", "Semrock FF02-617/73-25 Brightline", "561-610-40m"), ("GFP-GCaMP", "Semrock FF02-525/40-25 Brightline", "488-525-25m")]
 
-    NP_ImVol, NP_OptChanRef = create_im_vol(nwbfile, 'NeuroPALImVol', device, 'NeuroPAL image of C. elegans brain', channels, grid_spacing=scale)
+    NP_ImVol = create_im_vol(nwbfile, 'NeuroPALImVol', device, 'NeuroPAL image of C. elegans brain', channels, grid_spacing=scale)
 
     csv = pd.read_csv(csvfile, skiprows=6)
 
@@ -747,11 +743,10 @@ def process_yemini(folder):
     )
 
     neuroPAL_module.add(NeuroPALImSeg)
-    neuroPAL_module.add(NP_OptChanRef)
 
     NP_descrip = 'NeuroPAL structural image'
 
-    NP_image = create_image('NeuroPALImageRaw', NP_descrip, data, NP_ImVol, NP_OptChanRef, RGBW_channels=prefs)
+    NP_image = create_image('NeuroPALImageRaw', NP_descrip, data, NP_ImVol, RGBW_channels=prefs)
 
     nwbfile.add_acquisition(NP_image)
 
@@ -759,7 +754,7 @@ def process_yemini(folder):
 
     Calc_descrip = 'Imaging volume used to acquire calcium imaging data'
 
-    Calc_ImVol, Calc_OptChanRef = create_im_vol(nwbfile, 'CalciumImVol', device, Calc_descrip, gc_optchan, grid_spacing=gcscale)
+    Calc_ImVol = create_im_vol(nwbfile, 'CalciumImVol', device, Calc_descrip, gc_optchan, grid_spacing=gcscale)
 
     Calc_name = 'CalciumImageSeries'
     description = 'Raw GCaMP series images'
@@ -859,10 +854,9 @@ def process_yemini(folder):
     calcium_im_module.add(ProcCalcImSeg)
     calcium_im_module.add(SignalFluor)
     calcium_im_module.add(dNMFFluor)
-    calcium_im_module.add(Calc_OptChanRef)
     calcium_im_module.add(calcium_labels)
 
-    io = NWBHDF5IO(datapath + '/Yemini_NWB/'+worm+'.nwb', mode='w')
+    io = NWBHDF5IO(datapath + '/final_nwb/EY/'+worm+'.nwb', mode='w')
     io.write(nwbfile)
     io.close()
 
@@ -907,7 +901,7 @@ def process_Yem_original(file):
 
     channels = [("mTagBFP2", "Semrock FF01-445/45-25 Brightline", "405-445-45m"), ("Tag RFP-T", "Semrock FF02-617/73-25 Brightline", "561-610-40m"), ("GFP-GCaMP", "Semrock FF02-525/40-25 Brightline", "488-525-25m"), ("CyOFP1", "Semrock FF02-617/73-25 Brightline", "488-610-40m"),  ("mNeptune 2.5", "Semrock FF01-731/137-25 Brightline","561-731-70m")]
 
-    NP_ImVol, NP_OptChanRef = create_im_vol(nwbfile, 'NeuroPALImVol', device, 'NeuroPAL image of C. elegans brain', channels, grid_spacing=scale)
+    NP_ImVol = create_im_vol(nwbfile, 'NeuroPALImVol', device, 'NeuroPAL image of C. elegans brain', channels, grid_spacing=scale)
 
     csv = pd.read_csv(csvfile, skiprows=6)
 
@@ -935,15 +929,14 @@ def process_Yem_original(file):
     )
 
     neuroPAL_module.add(NeuroPALImSeg)
-    neuroPAL_module.add(NP_OptChanRef)
 
     NP_descrip = 'NeuroPAL structural image'
 
-    NP_image = create_image('NeuroPALImageRaw', NP_descrip, data, NP_ImVol, NP_OptChanRef, RGBW_channels=prefs)
+    NP_image = create_image('NeuroPALImageRaw', NP_descrip, data, NP_ImVol, RGBW_channels=prefs)
 
     nwbfile.add_acquisition(NP_image)
 
-    io = NWBHDF5IO('/Users/danielysprague/foco_lab/data/NP_nwb/'+worm+'.nwb', mode='w')
+    io = NWBHDF5IO(datapath + '/final_nwb/NP_og/'+worm+'.nwb', mode='w')
     io.write(nwbfile)
     io.close()
 
@@ -986,7 +979,7 @@ def process_chaudhary(folder):
 
     channels = [("mNeptune 2.5", "Semrock FF01-731/137-25 Brightline","561-731-70m"), ("CyOFP1", "Semrock FF02-617/73-25 Brightline", "488-610-40m"), ("mTagBFP2", "Semrock FF01-445/45-25 Brightline", "405-445-45m"), ("Tag RFP-T", "Semrock FF02-617/73-25 Brightline", "561-610-40m")]
 
-    NP_ImVol, NP_OptChanRef = create_im_vol(nwbfile, 'NeuroPALImVol', device, 'NeuroPAL image of C. elegans brain', channels, grid_spacing=scale)
+    NP_ImVol = create_im_vol(nwbfile, 'NeuroPALImVol', device, 'NeuroPAL image of C. elegans brain', channels, grid_spacing=scale)
 
     csv = pd.read_csv(csvfile)
 
@@ -1014,15 +1007,14 @@ def process_chaudhary(folder):
     )
 
     neuroPAL_module.add(NeuroPALImSeg)
-    neuroPAL_module.add(NP_OptChanRef)
 
     NP_descrip = 'NeuroPAL structural image'
 
-    NP_image = create_image('NeuroPALImageRaw', NP_descrip, data, NP_ImVol, NP_OptChanRef, RGBW_channels=prefs)
+    NP_image = create_image('NeuroPALImageRaw', NP_descrip, data, NP_ImVol, RGBW_channels=prefs)
 
     nwbfile.add_acquisition(NP_image)
 
-    io = NWBHDF5IO('/Users/danielysprague/foco_lab/data/NWB_Chaudhary/'+worm+'.nwb', mode='w')
+    io = NWBHDF5IO('/Users/danielysprague/foco_lab/data/final_nwb/HL'+worm+'.nwb', mode='w')
     io.write(nwbfile)
     io.close()
 
@@ -1050,9 +1042,6 @@ if __name__ == '__main__':
         if folder == '.DS_Store' or folder in ignore_datasets:
             continue
 
-        #if os.path.exists(datapath+'/NWB_Ray/'+folder+'.nwb'):
-        #    continue
-
         strain = strain_dict[folder]
         print(folder)
         t0 = time.time()
@@ -1064,7 +1053,7 @@ if __name__ == '__main__':
         print(t1-t0)
         break
     
-    '''
+    
     for folder in os.listdir(datapath+'/Yemini_21/OH16230/Heads'):
         if folder == '.DS_Store':
             continue
@@ -1083,8 +1072,7 @@ if __name__ == '__main__':
         print(folder)
 
         if folder == '2022-04-26-w00-NP1' or folder == '2022-04-26-w01-NP1':
-            continue
-            #process_NP_FOCO_original(datapath, folder, strain, calc=True)
+            process_NP_FOCO_original(datapath, folder, strain, calc=True)
         else:
             process_NP_FOCO_original(datapath, folder, strain, calc=False)
 
@@ -1101,5 +1089,3 @@ if __name__ == '__main__':
         if folder == '.DS_Store':
             continue
         process_chaudhary(datapath+ '/NP_chaudhary/'+ folder)
-
-    '''
