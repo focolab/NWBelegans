@@ -286,6 +286,7 @@ class Atlas:
         # covariance regression solver
         
         cost = [0,0]
+
         sigma_inv = np.array([np.linalg.inv(model['sigma'][:,:,i]) 
                           for i in range(model['sigma'].shape[2])]).transpose([1,2,0])
         
@@ -341,16 +342,17 @@ class Atlas:
         
         # alignment of samples to best fit worm
         for i in range(pos.shape[2]):
-            for j in match_indexes:
-                S0,R0,T0 = Helpers.scaled_rotation(pos[:,:,i],pos[:,:,j])
-                cost[i,j] = np.sqrt(np.nanmean(np.nansum((pos[:,:,i]@(R0*S0)+T0-pos[:,:,j])**2,1),0))
+            for j, num in enumerate(match_indexes):
+                S0,R0,T0 = Helpers.scaled_rotation(pos[:,:,i],pos[:,:,num])
+                cost[i,j] = np.sqrt(np.nanmean(np.nansum((pos[:,:,i]@(R0*S0)+T0-pos[:,:,num])**2,1),0))
+
                 aligned[j][:,:3,i] = pos[:,:,i]@(R0*S0)+T0
                 aligned[j][:,3:,i] = col[:,:,i]
         
         jidx = np.argmin(cost.sum(0))
         X = aligned[jidx]
 
-        model['mu']     = np.nanmean(X[:,:,train_indices],2)       
+        model['mu'] = np.nanmean(X[:,:,train_indices],2)   
         
         return model,X
     
@@ -423,7 +425,7 @@ class Atlas:
     
     
     @staticmethod
-    def sort_mu(ims,neurons=None):
+    def sort_mu(ims, train_indices, neurons=None):
         
         annotations = [x.get_annotations() for x in ims]
         scales = [np.array([1,1,1]) for x in ims]
@@ -448,7 +450,7 @@ class Atlas:
         
         # computing the number of worms with missing data for each
         # neuron
-        counts = (~np.isnan(pos.sum(1))).sum(1)
+        counts = (~np.isnan(pos[:,:,train_indices].sum(1))).sum(1)
         # filtering the neurons based on min_count of the missing data
         good_indices = np.logical_and( counts>Atlas.min_counts, 
                                       ~np.array([x == '' or x == None for x in N]))
@@ -498,7 +500,7 @@ class Atlas:
                               
         C = colors[0].shape[1]
 
-        N,col,pos,counts = Atlas.sort_mu(ims)
+        N,col,pos,counts = Atlas.sort_mu(ims, train_indices)
 
         if match_indexes == []:
             match_indexes = range(len(ims))
@@ -510,15 +512,11 @@ class Atlas:
         
         cost = []
         for iteration in range(Atlas.iter):
-            # updating means.
+            # updating means
             model['mu'] = Atlas.estimate_mu(model['mu'],aligned[:,:,train_indices])
             
             # updating sigma
             model['sigma'] = Atlas.estimate_sigma(model['mu'],aligned[:,:,train_indices],reg=Atlas.epsilon)
-
-            print(model['mu'].shape)
-            print(model['sigma'].shape)
-            print(init_aligned.shape)
             
             # updating aligned
             params,aligned,cost_ = Atlas.update_beta(init_aligned,model)

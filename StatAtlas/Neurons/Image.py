@@ -16,7 +16,7 @@ class Image:
         
     """
 
-    def __init__(self,bodypart,neurons=[],scale=np.ones((3))):
+    def __init__(self,bodypart, neurons=[],scale=np.ones((3)), filename=None, group= None, match= False,):
         """Construct an instance of this class.
     
         Args:
@@ -35,6 +35,10 @@ class Image:
         
         # Set the neurons
         self.neurons = neurons
+
+        self.filename = filename
+        self.group = group
+        self.match = match
         
     
     def get_positions(obj,scale=1):

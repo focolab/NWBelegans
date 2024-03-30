@@ -31,9 +31,13 @@ def get_nwb_neurons(filepath, atlas_neurons):
 
     RGB = image[:,:,:,RGB_channels]
 
+    blobs = blobs[(blobs['x']<RGB.shape[0])&(blobs['y']<RGB.shape[1])&(blobs['z']<RGB.shape[2])]
+
+    idx_keep = [i for i, row in blobs.iterrows() if (row['x']<RGB.shape[0]) and (row['y']<RGB.shape[1]) and (row['z']<RGB.shape[2])]
+
     blobs[['R','G','B']] = [RGB[row['x'],row['y'],row['z'],:] for i, row in blobs.iterrows()]
     blobs[['xr', 'yr', 'zr']] = [[row['x']*scale[0],row['y']*scale[1], row['z']*scale[2]] for i, row in blobs.iterrows()]
-    blobs['ID'] = labels
+    blobs['ID'] = [labels[i] for i in idx_keep]
 
     blobs = blobs.replace('nan', np.nan, regex=True) 
 
@@ -82,9 +86,13 @@ def get_dataset_online(dandi_id, atlas_neurons):
                 RGB_channels = channels[:-1]
                 RGB = image[:,:,:,RGB_channels]
 
+                blobs = blobs[(blobs['x']<RGB.shape[0])&(blobs['y']<RGB.shape[1])&(blobs['z']<RGB.shape[2])]
+
+                idx_keep = [i for i, row in blobs.iterrows() if (row['x']<RGB.shape[0]) and (row['y']<RGB.shape[1]) and (row['z']<RGB.shape[2])]
+
                 blobs[['R','G','B']] = [RGB[row['x'],row['y'],row['z'],:] for i, row in blobs.iterrows()]
                 blobs[['xr', 'yr', 'zr']] = [[row['x']*scale[0],row['y']*scale[1], row['z']*scale[2]] for i, row in blobs.iterrows()]
-                blobs['ID'] = labels
+                blobs['ID'] = [labels[i] for i in idx_keep]
 
                 blobs = blobs.replace('nan', np.nan, regex=True) 
 

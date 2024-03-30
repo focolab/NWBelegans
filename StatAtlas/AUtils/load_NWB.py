@@ -9,6 +9,7 @@ import pandas as pd
 import h5py
 from dandi.dandiapi import DandiAPIClient
 import remfile
+import pickle
 
 from pynwb import load_namespaces, get_class, register_class, NWBFile, TimeSeries, NWBHDF5IO
 from pynwb.file import MultiContainerInterface, NWBContainer, Device, Subject
@@ -20,11 +21,12 @@ from pynwb.image import ImageSeries
 
 from ndx_multichannel_volume import CElegansSubject, OpticalChannelReferences, OpticalChannelPlus, ImagingVolume, VolumeSegmentation, MultiChannelVolume, MultiChannelVolumeSeries
 
-def load_NWB(datapath, folders, bodypart='head'):
+def load_NWB(datapath, folders, match, group_assigns, bodypart='head', histmatched=True, skipfiles=[]):
 
     ims = []
 
-    for folder in folders:
+    for i, folder in enumerate(folders):
+        to_match = match[i]
         if folder.split(':')[0] == 'dandi': #if accessing from Dandi folder
             dandi_id = folder.split(':')[1]
             with DandiAPIClient() as client:
@@ -43,6 +45,11 @@ def load_NWB(datapath, folders, bodypart='head'):
                             image = read_nwb.acquisition['NeuroPALImageRaw'].data[:]
                             scale = read_nwb.imaging_planes['NeuroPALImVol'].grid_spacing[:] #get which channels of the image correspond to which RGBW pseudocolors
 
+                        print(identifier)
+
+                        if identifier in skipfiles:
+                            continue
+
                         labels = ["".join(label) for label in labels]
 
                         labels = [label[:-1] if label.endswith('?') else label for label in labels]
@@ -50,18 +57,39 @@ def load_NWB(datapath, folders, bodypart='head'):
                         blobs = pd.DataFrame.from_records(seg, columns = ['X', 'Y', 'Z', 'weight'])
                         blobs = blobs.drop(['weight'], axis=1)
 
-                        histmatch_mat = loadmat('/Users/danielysprague/foco_lab/data/hist_matched/'+identifier+'.mat')
+                        histmatch_mat = loadmat('/Users/danielysprague/foco_lab/data/hist_matched_test3/'+identifier+'.mat')
 
-                        RGBW = histmatch_mat['data_matched']
-                        #RGBW = np.transpose(histmatch_mat['data_matched'], (1,0,2,3))
+                        if dandi_id == '000692':
+                            RGBW = histmatch_mat['data_matched']
+                        else:
+                            RGBW = np.transpose(histmatch_mat['data_matched'], (1,0,2,3))
 
-                        data_zscored = Zscore_frame(RGBW)
+                        if not histmatched:
+                            print('not matched')
+                            RGB = image[:,:,:,channels[:-1]]
+                            zscore_RGB = Zscore_frame(RGB)
 
-                        zscore_RGB = data_zscored[:,:,:,:-1] #remove white channel
+                        else:
+                            print('matched')
+                            zscore_RGB = Zscore_frame(RGBW[:,:,:]) 
+
+                        if dandi_id == '000565':
+                            with open('/Users/danielysprague/foco_lab/data/SK1_crop.pkl', 'rb') as f:
+                                cropped_dict = pickle.load(f)
+                            start_x = int(cropped_dict[identifier][0])
+                            end_x = int(cropped_dict[identifier][1])
+                            blobs = blobs[(blobs['x']>start_x)&(blobs['x']<end_x)]
+                            idx_keep = [i for i, row in blobs.iterrows() if (row['x']>start_x) and (row['x']<end_x)]
+                            blobs['x'] = blobs['x'] - start_x
+                            blobs=blobs.reset_index()
+                            labels = [labels[i] for i in idx_keep]
+
+                        idx_keep = [i for i, row in blobs.iterrows() if (row['x']<RGBW.shape[0]) and (row['y']<RGBW.shape[1]) and (row['z']<RGBW.shape[2])]
+                        blobs = blobs[(blobs['x']<RGBW.shape[0])&(blobs['y']<RGBW.shape[1])&(blobs['z']<RGBW.shape[2])]
 
                         blobs[['R','G','B']] = [zscore_RGB[row['x'],row['y'],row['z'],:] for i, row in blobs.iterrows()]
                         blobs[['xr', 'yr', 'zr']] = [[row['x']*scale[0],row['y']*scale[1], row['z']*scale[2]] for i, row in blobs.iterrows()]
-                        blobs['ID'] = labels
+                        blobs['ID'] = [labels[i] for i in idx_keep]
 
                         neurons = []
                         for i, row in blobs.iterrows():
@@ -77,16 +105,20 @@ def load_NWB(datapath, folders, bodypart='head'):
                             neuron.annotation = row['ID']
                             neuron.annotation_confidence = .99
 
-                            if neuron.annotation == 'AS2': #AS2 causing issues across the board so just removing. Nemanode does not consider it a head neuron
+                            if neuron.annotation == 'AS2' or neuron.annotation == 'AVK' or '?' in neuron.annotation or neuron.annotation=='IL1V': #AS2 causing issues across the board so just removing. Nemanode does not consider it a head neuron, AVK causing similar problems
                                 continue
                             
                             neurons.append(neuron)
 
-                        im = Image.Image(bodypart,neurons)
+                        filename = identifier
+                        group = group_assigns[filename]
+
+                        im = Image.Image(bodypart,neurons, filename= filename, group= group, match = to_match)
                         ims.append(im)
 
         else:
             for file in os.listdir(datapath+'/'+folder):
+                print(file)
 
                 if not file[-4:] =='.nwb':
                     continue
@@ -95,12 +127,16 @@ def load_NWB(datapath, folders, bodypart='head'):
 
                 with NWBHDF5IO(filepath, mode='r', load_namespaces=True) as io:
                     read_nwb = io.read()
+                    identifier = read_nwb.identifier
                     seg = read_nwb.processing['NeuroPAL']['NeuroPALSegmentation']['NeuroPALNeurons'].voxel_mask[:]
                     labels = read_nwb.processing['NeuroPAL']['NeuroPALSegmentation']['NeuroPALNeurons']['ID_labels'][:]
                     channels = read_nwb.acquisition['NeuroPALImageRaw'].RGBW_channels[:] #get which channels of the image correspond to which RGBW pseudocolors
                     image = read_nwb.acquisition['NeuroPALImageRaw'].data[:]
                     scale = read_nwb.imaging_planes['NeuroPALImVol'].grid_spacing[:] #get which channels of the image correspond to which RGBW pseudocolors
             
+                if identifier in skipfiles:
+                    continue
+                
                 labels = ["".join(label) for label in labels]
 
                 labels = [label[:-1] if label.endswith('?') else label for label in labels]
@@ -108,17 +144,36 @@ def load_NWB(datapath, folders, bodypart='head'):
                 blobs = pd.DataFrame.from_records(seg, columns = ['X', 'Y', 'Z', 'weight'])
                 blobs = blobs.drop(['weight'], axis=1)
 
-                histmatch_mat = loadmat('/Users/danielysprague/foco_lab/data/hist_matched/'+file[:-4]+'.mat')
+                histmatch_mat = loadmat('/Users/danielysprague/foco_lab/data/hist_matched_test3/'+file[:-4]+'.mat')
 
                 RGBW = np.transpose(histmatch_mat['data_matched'], (1,0,2,3))
 
-                data_zscored = Zscore_frame(RGBW)
+                if not histmatched:
+                    print('not matched')
+                    RGB = image[:,:,:,channels[:-1]]
+                    zscore_RGB = Zscore_frame(RGB)
 
-                zscore_RGB = data_zscored[:,:,:,:-1] #remove white channel
+                else:
+                    print('matched')
+                    zscore_RGB = Zscore_frame(RGBW[:,:,:])
+
+                if folder == 'SK1':
+                    with open('/Users/danielysprague/foco_lab/data/SK1_crop.pkl', 'rb') as f:
+                        cropped_dict = pickle.load(f)
+                    start_x = int(cropped_dict[identifier][0])
+                    end_x = int(cropped_dict[identifier][1])
+                    blobs = blobs[(blobs['x']>start_x)&(blobs['x']<end_x)]
+                    idx_keep = [i for i, row in blobs.iterrows() if (row['x']>start_x) and (row['x']<end_x)]
+                    blobs['x'] = blobs['x'] - start_x
+                    blobs=blobs.reset_index()
+                    labels = [labels[i] for i in idx_keep]
+
+                idx_keep = [i for i, row in blobs.iterrows() if (row['x']<RGBW.shape[0]) and (row['y']<RGBW.shape[1]) and (row['z']<RGBW.shape[2])]
+                blobs = blobs[(blobs['x']<RGBW.shape[0])&(blobs['y']<RGBW.shape[1])&(blobs['z']<RGBW.shape[2])]
 
                 blobs[['R','G','B']] = [zscore_RGB[row['x'],row['y'],row['z'],:] for i, row in blobs.iterrows()]
                 blobs[['xr', 'yr', 'zr']] = [[row['x']*scale[0],row['y']*scale[1], row['z']*scale[2]] for i, row in blobs.iterrows()]
-                blobs['ID'] = labels
+                blobs['ID'] = [labels[i] for i in idx_keep]
 
                 neurons = []
                 for i, row in blobs.iterrows():
@@ -134,12 +189,15 @@ def load_NWB(datapath, folders, bodypart='head'):
                     neuron.annotation = row['ID']
                     neuron.annotation_confidence = .99
 
-                    if neuron.annotation == 'AS2': #AS2 causing issues across the board so just removing. Nemanode does not consider it a head neuron
+                    if neuron.annotation == 'AS2' or neuron.annotation == 'AVK' or '?' in neuron.annotation or neuron.annotation=='IL1V': #AS2 causing issues across the board so just removing. Nemanode does not consider it a head neuron, AVK causing similar problems
                         continue
                     
                     neurons.append(neuron)
 
-                im = Image.Image(bodypart,neurons)
+                filename = identifier
+                group = group_assigns[filename]
+
+                im = Image.Image(bodypart,neurons, filename= filename, group= group, match = to_match)
                 ims.append(im)
 
     return ims

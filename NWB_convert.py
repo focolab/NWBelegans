@@ -288,14 +288,14 @@ def process_NP_FOCO_original(datapath,dataset, strain, calc = False):
 
     Proc_ImVol = create_im_vol(nwbfile, 'ProcessedImVol', microscope, Proc_descrip,[channels[i] for i in RGBW_channels])
 
-    if not os.path.exists(datapath+ '/NP_FOCO_hist_match/' + dataset + '/hist_match_image.tif'):
-        proc_mat = datapath+ '/NP_FOCO_hist_match/' + dataset + '/hist_match_image.mat'
+    #if not os.path.exists(datapath+ '/NP_FOCO_hist_match/' + dataset + '/hist_match_image.tif'):
+    #    proc_mat = datapath+ '/NP_FOCO_hist_match/' + dataset + '/hist_match_image.mat'
 
-        imfile = sio.loadmat(proc_mat)
-        im = np.transpose(imfile['Hist_RGBW'],(2,3,0,1))
-        im = im.astype('uint16')
+    #    imfile = sio.loadmat(proc_mat)
+    #    im = np.transpose(imfile['Hist_RGBW'],(2,3,0,1))
+    #    im = im.astype('uint16')
 
-        tifffile.imwrite(datapath + '/NP_FOCO_hist_match/'+folder+'/hist_match_image.tif', im, imagej = True)
+    #    tifffile.imwrite(datapath + '/NP_FOCO_hist_match/'+folder+'/hist_match_image.tif', im, imagej = True)
 
     proc_file = datapath+ '/NP_FOCO_hist_match/' + dataset + '/hist_match_image.tif'
     proc_data = np.transpose(skio.imread(proc_file), [2,1,0,3])
@@ -435,6 +435,7 @@ def process_NP_FOCO_original(datapath,dataset, strain, calc = False):
 
 def process_NP_FOCO_Ray(datapath, dataset, strain, calc=False):
 
+
     identifier = dataset
     session_description = 'NeuroPAL and calcium imaging of immobilized worm with optogenetic stimulus'
     session_start_time = datetime(int(identifier[0:4]), int(identifier[4:6]), int(identifier[6:8]), int(identifier[9:11]), int(identifier[12:14]), int(identifier[15:]), tzinfo=tz.gettz("US/Pacific"))
@@ -467,7 +468,7 @@ def process_NP_FOCO_Ray(datapath, dataset, strain, calc=False):
 
 
     #TODO: update if statement for 0426 datasets
-    if folder <'20230322':
+    if dataset <'20230322':
         channels = [("mTagBFP2", "Chroma ET 460/50", "405-460-50m"), ("CyOFP1", "Chroma ET 605/70","488-605-70m"), ("GFP-GCaMP", "Chroma ET 525/50","488-525-50m"), ("mNeptune 2.5", "Chroma ET 700/75", "561-700-75m"), ("Tag RFP-T", "Chroma ET 605/70", "561-605-70m"), ("mNeptune 2.5-far red", "Chroma ET 700/75", "639-700-75m")]
         RGBW_channels = [3,1,0,4]
     else:
@@ -490,6 +491,11 @@ def process_NP_FOCO_Ray(datapath, dataset, strain, calc=False):
 
     blob_file = datapath + '/Manual_annotate/' + dataset + '/blobs.csv'
     blobs = pd.read_csv(blob_file)
+
+    if dataset == '20221106-21-47-31': # blob file values are flipped 
+        blobs['X'] = data.shape[0] - blobs['X']
+        blobs['Y'] = data.shape[1] - blobs['Y']
+        blobs['Z'] = data.shape[2] - blobs['Z']
 
     IDs = blobs['ID']
     labels = IDs.replace(np.nan,'',regex=True)
@@ -531,7 +537,7 @@ def process_NP_FOCO_Ray(datapath, dataset, strain, calc=False):
     if calc:
         GCaMP_chan = [("GFP-GCaMP", "Chroma ET 525/50","488-525-50m")]
 
-        if folder <'20230506':
+        if dataset <'20230506':
             Calc_scale = [0.3208, 0.3208, 2.5]
         else:
             Calc_scale = [0.1604, 0.1604, 3.0]
@@ -988,6 +994,7 @@ def process_chaudhary(folder):
     blobs['X'] = round(blobs['X'])
     blobs['Y'] = round(blobs['Y'])
     blobs['Z'] = round(blobs['Z'])
+    blobs['Z'] = data.shape[2] - blobs['Z']
     blobs = blobs.astype({'X':'uint16', 'Y':'uint16', 'Z':'uint16'})
     pos = np.asarray(blobs[['X', 'Y', 'Z']])
     IDs = blobs['ID']
@@ -1051,8 +1058,8 @@ if __name__ == '__main__':
             process_NP_FOCO_Ray(datapath, folder, strain)
         t1 = time.time()
         print(t1-t0)
-        break
     
+    '''
     
     for folder in os.listdir(datapath+'/Yemini_21/OH16230/Heads'):
         if folder == '.DS_Store':
@@ -1089,3 +1096,4 @@ if __name__ == '__main__':
         if folder == '.DS_Store':
             continue
         process_chaudhary(datapath+ '/NP_chaudhary/'+ folder)
+    '''
