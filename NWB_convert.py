@@ -18,10 +18,11 @@ from pynwb.image import ImageSeries
 import scipy.io as sio
 import skimage.io as skio
 from tifffile import TiffFile
+import tifffile
 import time
 
 # ndx_mulitchannel_volume is the novel NWB extension for multichannel optophysiology in C. elegans
-from ndx_multichannel_volume import CElegansSubject, OpticalChannelReferences, OpticalChannelPlus, ImagingVolume, VolumeSegmentation, MultiChannelVolume, MultiChannelVolumeSeries
+from ndx_multichannel_volume import CElegansSubject, OpticalChannelReferences, OpticalChannelPlus, ImagingVolume, VolumeSegmentation, MultiChannelVolume, MultiChannelVolumeSeries, SegmentationLabels
 
 def gen_file(description, experimenter, exp_descript, identifier, start_date_time, lab, institution, pubs):
 
@@ -85,10 +86,10 @@ def create_im_vol(nwbfile, name, device, description, channels, location="head",
         )
 
         OptChannels.append(OptChan)
-        OptChanRefData.append(wave)
+        OptChanRefData.append(fluor)
 
     OptChanRefs = OpticalChannelReferences(
-        name = 'OpticalChannelRefs',
+        name = 'order_optical_channels',
         channels = OptChanRefData
     )
 
@@ -108,13 +109,12 @@ def create_im_vol(nwbfile, name, device, description, channels, location="head",
 
     nwbfile.add_imaging_plane(ImVol)
 
-    return ImVol, OptChanRefs
+    return ImVol
 
-def create_image(name, description, data, ImVol, OptChanRefs, RGBW_channels=[0,1,2,3]):
+def create_image(name, description, data, ImVol, RGBW_channels=[0,1,2,3]):
 
     image = MultiChannelVolume(
         name = name,
-        order_optical_channels = OptChanRefs,
         description = description,
         RGBW_channels = RGBW_channels,
         data = data,
@@ -162,7 +162,6 @@ def create_vol_seg_centers(name, description, ImagingVolume, positions, labels=N
             index=True
         )
     
-
     return vs
 
 def create_calc_series(name, data, description, comments,  device, imaging_volume, unit, scan_line_rate, dimension, rate, resolution, compression = False):
@@ -211,8 +210,231 @@ def iter_calc_tiff(filename, numZ):
 
     return
 
+def process_NP_FOCO_original(datapath,dataset, strain, calc = False):
 
-def process_NP_FOCO_Ray(datapath, dataset, strain):
+    identifier = dataset
+    session_description = 'NeuroPAL and calcium imaging of immobilized worm with optogenetic stimulus'
+    session_start_time = datetime(int(identifier[0:4]), int(identifier[5:7]), int(identifier[8:10]), tzinfo=tz.gettz("US/Pacific"))
+    lab = 'FOCO lab'
+    institution = 'UCSF'
+    pubs = ''
+    experimenter = 'Jackson Borchardt + Greg Bubnis'
+    if calc:
+        experiment_description = 'NeuroPAL images and GCaMP time series'
+    else:
+        experiment_description = 'NeuroPAL structural images'
+
+    nwbfile = gen_file(session_description, experimenter, experiment_description, identifier, session_start_time, lab, institution, pubs)
+
+    subject_description = 'NeuroPAL worm in microfluidic chip'
+    dob = datetime(int(identifier[0:4]), int(identifier[5:7]), int(identifier[8:10]), tzinfo=tz.gettz("US/Pacific"))
+    growth_stage = 'YA'
+    gs_time = pd.Timedelta(hours=2, minutes=30).isoformat()
+    cultivation_temp = 20.
+    sex = "O"
+
+    nwbfile = create_subject(nwbfile, subject_description, identifier, dob, growth_stage, gs_time, cultivation_temp, sex, strain)
+
+    microname = "Spinning disk confocal"
+    microdescrip = "Leica DMi8 Inverted Microscope with Yokogawa CSU-W1 SoRA, 40x WI objective 1.1 NA"
+    manufacturer = "Leica, Yokogawa"
+
+    microscope = create_device(nwbfile, microname, microdescrip, manufacturer)
+
+    matfile = datapath + '/NP_FOCO_cropped/' +dataset +'/neuropal_1_MMStack_Pos0.ome.mat'
+    mat = sio.loadmat(matfile)
+    scale = np.asarray(mat['info']['scale'][0][0]).flatten()
+
+    channels = [("mNeptune 2.5", "Chroma ET 700/75", "561-700-75m"), ("Tag RFP-T", "Chroma ET 605/70", "561-605-70m"), ("CyOFP1", "Chroma ET 605/70","488-605-70m"), ("GFP-GCaMP", "Chroma ET 525/50","488-525-50m"), ("mTagBFP2", "Chroma ET 460/50", "405-460-50m"),  ("mNeptune 2.5-far red", "Chroma ET 700/75", "639-700-75m")]
+    RGBW_channels = [0,2,4,1]
+
+    NP_descrip = 'NeuroPAL image of C. elegans brain'
+
+    NP_ImVol = create_im_vol(nwbfile, 'NeuroPALImVol', microscope, NP_descrip,channels, location="head", grid_spacing = scale)
+
+    raw_file = datapath + '/NP_FOCO_cropped/' + dataset + '/neuropal_1_MMStack_Pos0.ome.tif'
+    data = skio.imread(raw_file)
+    data = np.transpose(data)
+
+    ImDescrip = 'NeuroPAL structural image'
+
+    NP_image = create_image('NeuroPALImageRaw', ImDescrip, data, NP_ImVol, RGBW_channels=RGBW_channels)
+
+    nwbfile.add_acquisition(NP_image)
+
+    blob_file = datapath + '/NP_FOCO_cropped/' + dataset + '/blobs.csv'
+    blobs = pd.read_csv(blob_file)
+
+    IDs = blobs['ID']
+    labels = IDs.replace(np.nan,'',regex=True)
+    labels = list(np.asarray(labels)) 
+    positions = np.asarray(blobs[['X', 'Y', 'Z']])
+
+    vs_descrip = 'Neuron centers for multichannel volumetric image. Weight set at 1 for all voxels. Labels refers to cell ID of segmented neurons.'
+
+    NeuroPALImSeg = ImageSegmentation(
+        name = 'NeuroPALSegmentation',
+        plane_segmentations = create_vol_seg_centers('NeuroPALNeurons', vs_descrip, NP_ImVol, positions, labels=labels)
+    )
+
+    neuroPAL_module = nwbfile.create_processing_module(
+        name = 'NeuroPAL',
+        description = 'NeuroPAL image data and metadata'
+    )
+
+    neuroPAL_module.add(NeuroPALImSeg)
+
+    Proc_descrip = 'Processed NeuroPAL image'
+
+    Proc_ImVol = create_im_vol(nwbfile, 'ProcessedImVol', microscope, Proc_descrip,[channels[i] for i in RGBW_channels])
+
+    #if not os.path.exists(datapath+ '/NP_FOCO_hist_match/' + dataset + '/hist_match_image.tif'):
+    #    proc_mat = datapath+ '/NP_FOCO_hist_match/' + dataset + '/hist_match_image.mat'
+
+    #    imfile = sio.loadmat(proc_mat)
+    #    im = np.transpose(imfile['Hist_RGBW'],(2,3,0,1))
+    #    im = im.astype('uint16')
+
+    #    tifffile.imwrite(datapath + '/NP_FOCO_hist_match/'+folder+'/hist_match_image.tif', im, imagej = True)
+
+    proc_file = datapath+ '/NP_FOCO_hist_match/' + dataset + '/hist_match_image.tif'
+    proc_data = np.transpose(skio.imread(proc_file), [2,1,0,3])
+
+    ProcDescrip = 'NeuroPAL image with median filtering followed by color histogram matching to reference NeuroPAL images'
+
+    Proc_image = create_image('ProcessedImage', ProcDescrip, proc_data, Proc_ImVol, RGBW_channels=[0,1,2,3])
+
+    processed_im_module = nwbfile.create_processing_module(
+        name = 'ProcessedImage',
+        description = 'Data and metadata associated with the pre-processed neuroPAL image.'
+    )
+
+    processed_im_module.add(Proc_image)
+
+    if calc:
+
+        GCaMP_chan = [("GFP-GCaMP", "Chroma ET 525/50","488-525-50m")]
+
+        Calc_scale = [0.3208, 0.3208, 1.5]
+
+        Calc_descrip = 'Imaging volume used to acquire calcium imaging data'
+
+        Calc_ImVol = create_im_vol(nwbfile, 'CalciumImVol', microscope, Calc_descrip, GCaMP_chan, grid_spacing=Calc_scale)
+
+        Calc_file = datapath + '/NP_FOCO_cropped/' + dataset +'/' +dataset+'.tiff'
+
+        tif = TiffFile(Calc_file)
+
+        page = tif.pages[0]
+        numx = page.shape[0]
+        numy = page.shape[1]
+        numz = 12
+
+        data = DataChunkIterator(
+            data = iter_calc_tiff(Calc_file, numz),
+            maxshape = None,
+            buffer_size = 10
+        )
+
+        Calc_name = 'CalciumImageSeries'
+        description = 'Raw GCaMP series images'
+        comments = 'single channel GFP-GCaMP representing GCaMP signal'
+        Calc_unit = "Voxel gray counts"
+        scan_line_rate = 9504.
+        rate = 3.3
+        resolution = 1.0
+
+        Calc_ImSeries = create_calc_series(Calc_name, data, description, comments, microscope,Calc_ImVol, Calc_unit, scan_line_rate, [numx, numy, numz], rate, resolution, compression=True)
+
+        nwbfile.add_acquisition(Calc_ImSeries)
+
+        gce_file = datapath + '/NP_FOCO_cropped/' + dataset +'/' + dataset + '_dff.csv'
+
+        gce_quant = pd.read_csv(gce_file)
+
+        gce_df = gce_quant[['x', 'y', 'z', 'dff', 'neuron_id', 't', 'neuron_ndx']]
+
+        blobquant = None
+        for idx in gce_quant['neuron_ndx'].unique():
+            blob = gce_df[gce_df['neuron_ndx']==idx]
+            blobarr = np.asarray(blob[['x','y','z','dff','neuron_id']]) 
+            blobarr = blobarr[np.newaxis, :, :]
+            if blobquant is None:
+                blobquant=blobarr
+
+            else:
+                blobquant = np.vstack((blobquant, blobarr))
+
+        volsegs = []
+
+        for t in range(blobquant.shape[1]):
+            blobs = np.squeeze(blobquant[:,t,0:3])
+            IDs = np.squeeze(blobquant[:,t,4])
+            labels = IDs.astype(str)
+            labels = np.where(labels!='nan', labels, '')
+
+            vsname = 'Seg_tpoint_'+str(t)
+            description = 'Neuron segmentation for time point ' +str(t) + ' in calcium image series'
+            volseg = create_vol_seg_centers(vsname, description, Calc_ImVol, blobs, labels=labels)
+
+            volsegs.append(volseg)
+
+
+        CalcImSeg = ImageSegmentation(
+            name = 'CalciumSeriesSegmentation',
+            plane_segmentations = volsegs
+        )
+
+        calc_IDs = np.squeeze(blobquant[:,0,4])
+        calc_labels = calc_IDs.astype(str)
+        calc_labels = np.where(calc_labels!='nan', calc_labels, '')
+
+        Calclabels = SegmentationLabels(
+            name = 'NeuronIDs',
+            labels = calc_labels,
+            description = 'Calcium ROI segmentation labels',
+            ImageSegmentation = CalcImSeg
+        )
+
+        gce_data = np.transpose(blobquant[:,:,3])
+        gce_data = gce_data.astype(float)
+
+        rt_region = volsegs[0].create_roi_table_region(
+            description = 'Segmented neurons associated with calcium image series. This rt_region uses the location of the neurons at the first time point',
+            region = list(np.arange(blobquant.shape[0]))
+        )
+
+        RoiResponse = RoiResponseSeries( # CHANGE WITH FEEDBACK FROM RAY
+            name = 'SignalCalciumImResponseSeries',
+            description = 'DF/F activity for calcium imaging data',
+            data = gce_data,
+            rois = rt_region,
+            unit = 'Percentage',
+            rate = 3.3
+        )
+
+        SignalFluor = DfOverF(
+            name = 'SignalDFoF',
+            roi_response_series = RoiResponse
+        )
+
+        calcium_im_module = nwbfile.create_processing_module(
+        name = 'CalciumActivity',
+        description = 'Data and metadata associated with time series of calcium images'
+        )
+
+        calcium_im_module.add(CalcImSeg)
+        calcium_im_module.add(SignalFluor)
+        calcium_im_module.add(Calclabels)
+
+
+    io = NWBHDF5IO(datapath + '/final_nwb/SK2/'+identifier+'.nwb', mode='w')
+    io.write(nwbfile)
+    io.close()
+
+
+def process_NP_FOCO_Ray(datapath, dataset, strain, calc=False):
+
 
     identifier = dataset
     session_description = 'NeuroPAL and calcium imaging of immobilized worm with optogenetic stimulus'
@@ -244,16 +466,18 @@ def process_NP_FOCO_Ray(datapath, dataset, strain):
     mat = sio.loadmat(matfile)
     scale = np.asarray(mat['info']['scale'][0][0]).flatten()
 
-    if folder <'20230322':
+
+    #TODO: update if statement for 0426 datasets
+    if dataset <'20230322':
         channels = [("mTagBFP2", "Chroma ET 460/50", "405-460-50m"), ("CyOFP1", "Chroma ET 605/70","488-605-70m"), ("GFP-GCaMP", "Chroma ET 525/50","488-525-50m"), ("mNeptune 2.5", "Chroma ET 700/75", "561-700-75m"), ("Tag RFP-T", "Chroma ET 605/70", "561-605-70m"), ("mNeptune 2.5-far red", "Chroma ET 700/75", "639-700-75m")]
-        RGBW_channels = [0,1,3,4]
+        RGBW_channels = [3,1,0,4]
     else:
         channels = [("mTagBFP2", "Chroma ET 460/50", "405-460-50m"), ("CyOFP1", "Chroma ET 605/70","488-605-70m"), ("CyOFP1-high filter", "Chroma ET 700/75","488-700-75m"), ("GFP-GCaMP", "Chroma ET 525/50","488-525-50m"), ("mNeptune 2.5", "Chroma ET 700/75", "561-700-75m"), ("Tag RFP-T", "Chroma ET 605/70", "561-605-70m"), ("mNeptune 2.5-far red", "Chroma ET 700/75", "639-700-75m")]
-        RGBW_channels = [0,1,4,6]
+        RGBW_channels = [4,1,0,6]
 
     NP_descrip = 'NeuroPAL image of C. elegans brain'
 
-    NP_ImVol, NP_OptChanRef = create_im_vol(nwbfile, 'NeuroPALImVol', microscope, NP_descrip,channels, location="head", grid_spacing = scale)
+    NP_ImVol = create_im_vol(nwbfile, 'NeuroPALImVol', microscope, NP_descrip,channels, location="head", grid_spacing = scale)
 
     raw_file = datapath + '/NP_Ray/' + dataset + '/full_comp.tif'
     data = skio.imread(raw_file)
@@ -261,12 +485,17 @@ def process_NP_FOCO_Ray(datapath, dataset, strain):
 
     ImDescrip = 'NeuroPAL structural image'
 
-    NP_image = create_image('NeuroPALImageRaw', ImDescrip, data, NP_ImVol, NP_OptChanRef, RGBW_channels=RGBW_channels)
+    NP_image = create_image('NeuroPALImageRaw', ImDescrip, data, NP_ImVol, RGBW_channels=RGBW_channels)
 
     nwbfile.add_acquisition(NP_image)
 
     blob_file = datapath + '/Manual_annotate/' + dataset + '/blobs.csv'
     blobs = pd.read_csv(blob_file)
+
+    if dataset == '20221106-21-47-31': # blob file values are flipped 
+        blobs['X'] = data.shape[0] - blobs['X']
+        blobs['Y'] = data.shape[1] - blobs['Y']
+        blobs['Z'] = data.shape[2] - blobs['Z']
 
     IDs = blobs['ID']
     labels = IDs.replace(np.nan,'',regex=True)
@@ -286,18 +515,17 @@ def process_NP_FOCO_Ray(datapath, dataset, strain):
     )
 
     neuroPAL_module.add(NeuroPALImSeg)
-    neuroPAL_module.add(NP_OptChanRef)
 
     Proc_descrip = 'Processed NeuroPAL image'
 
-    Proc_ImVol, Proc_OptChanRef = create_im_vol(nwbfile, 'ProcessedImVol', microscope, Proc_descrip,[channels[i] for i in RGBW_channels])
+    Proc_ImVol = create_im_vol(nwbfile, 'ProcessedImVol', microscope, Proc_descrip,[channels[i] for i in RGBW_channels])
 
     proc_file = datapath+ '/manual_annotate/' + dataset + '/neuroPAL_image.tif'
     proc_data = np.transpose(skio.imread(proc_file), [2,1,0,3])
 
     ProcDescrip = 'NeuroPAL image with median filtering followed by color histogram matching to reference NeuroPAL images'
 
-    Proc_image = create_image('ProcessedImage', ProcDescrip, proc_data, Proc_ImVol, Proc_OptChanRef, RGBW_channels=[0,1,2,3])
+    Proc_image = create_image('ProcessedImage', ProcDescrip, proc_data, Proc_ImVol, RGBW_channels=[0,1,2,3])
 
     processed_im_module = nwbfile.create_processing_module(
         name = 'ProcessedImage',
@@ -305,110 +533,126 @@ def process_NP_FOCO_Ray(datapath, dataset, strain):
     )
 
     processed_im_module.add(Proc_image)
-    processed_im_module.add(Proc_OptChanRef)
 
-    GCaMP_chan = [("GFP-GCaMP", "Chroma ET 525/50","488-525-50m")]
+    if calc:
+        GCaMP_chan = [("GFP-GCaMP", "Chroma ET 525/50","488-525-50m")]
 
-    if folder <'20230506':
-        Calc_scale = [0.3208, 0.3208, 2.5]
-    else:
-        Calc_scale = [0.1604, 0.1604, 3.0]
-
-    Calc_descrip = 'Imaging volume used to acquire calcium imaging data'
-
-    Calc_ImVol, Calc_OptChanRef = create_im_vol(nwbfile, 'CalciumImVol', microscope, Calc_descrip, GCaMP_chan, grid_spacing=Calc_scale)
-
-    Calc_file = datapath + '/NP_Ray/' + dataset +'/' +dataset+'.tiff'
-
-    tif = TiffFile(Calc_file)
-
-    page = tif.pages[0]
-    numx = page.shape[0]
-    numy = page.shape[1]
-    numz = 12
-
-    data = DataChunkIterator(
-        data = iter_calc_tiff(Calc_file, numz),
-        maxshape = None,
-        buffer_size = 10
-    )
-
-    Calc_name = 'CalciumImageSeries'
-    description = 'Raw GCaMP series images'
-    comments = 'single channel GFP-GCaMP representing GCaMP signal'
-    Calc_unit = "Voxel gray counts"
-    scan_line_rate = 2995.
-    rate = 1.04
-    resolution = 1.0
-
-    Calc_ImSeries = create_calc_series(Calc_name, data, description, comments, microscope,Calc_ImVol, Calc_unit, scan_line_rate, [numx, numy, numz], rate, resolution, compression=True)
-
-    nwbfile.add_acquisition(Calc_ImSeries)
-
-    gce_file = datapath + '/NP_Ray/' + dataset +'/extractor-objects/' + dataset + '_gce_quantification.csv'
-
-    gce_quant = pd.read_csv(gce_file)
-
-    gce_df = gce_quant[['X', 'Y', 'Z', 'gce_quant', 'ID', 'T', 'blob_ix']]
-
-    blobquant = None
-    for idx in gce_quant['blob_ix'].unique():
-        blob = gce_df[gce_df['blob_ix']==idx]
-        blobarr = np.asarray(blob[['X','Y','Z','gce_quant','ID']]) 
-        blobarr = blobarr[np.newaxis, :, :]
-        if blobquant is None:
-            blobquant=blobarr
-
+        if dataset <'20230506':
+            Calc_scale = [0.3208, 0.3208, 2.5]
         else:
-            blobquant = np.vstack((blobquant, blobarr))
+            Calc_scale = [0.1604, 0.1604, 3.0]
 
-    volsegs = []
+        Calc_descrip = 'Imaging volume used to acquire calcium imaging data'
 
-    for t in range(blobquant.shape[1]):
-        blobs = np.squeeze(blobquant[:,t,0:3])
+        Calc_ImVol = create_im_vol(nwbfile, 'CalciumImVol', microscope, Calc_descrip, GCaMP_chan, grid_spacing=Calc_scale)
 
-        vsname = 'Seg_tpoint_'+str(t)
-        description = 'Neuron segmentation for time point ' +str(t) + ' in calcium image series'
-        volseg = create_vol_seg_centers(vsname, description, Calc_ImVol, blobs, reference_images=Calc_ImSeries)
+        Calc_file = datapath + '/NP_Ray/' + dataset +'/' +dataset+'.tiff'
 
-        volsegs.append(volseg)
+        tif = TiffFile(Calc_file)
 
-    CalcImSeg = ImageSegmentation(
-        name = 'CalciumSeriesSegmentation',
-        plane_segmentations = volsegs
-    )
+        page = tif.pages[0]
+        numx = page.shape[0]
+        numy = page.shape[1]
+        numz = 12
 
-    gce_data = np.transpose(blobquant[:,:,3])
+        data = DataChunkIterator(
+            data = iter_calc_tiff(Calc_file, numz),
+            maxshape = None,
+            buffer_size = 10
+        )
 
-    rt_region = volsegs[0].create_roi_table_region(
-        description = 'Segmented neurons associated with calcium image series. This rt_region uses the location of the neurons at the first time point',
-        region = list(np.arange(blobquant.shape[0]))
-    )
-
-    RoiResponse = RoiResponseSeries( # CHANGE WITH FEEDBACK FROM RAY
-        name = 'SignalCalciumImResponseSeries',
-        description = 'DF/F activity for calcium imaging data',
-        data = gce_data,
-        rois = rt_region,
-        unit = 'Percentage',
+        Calc_name = 'CalciumImageSeries'
+        description = 'Raw GCaMP series images'
+        comments = 'single channel GFP-GCaMP representing GCaMP signal'
+        Calc_unit = "Voxel gray counts"
+        scan_line_rate = 2995.
         rate = 1.04
-    )
+        resolution = 1.0
 
-    SignalFluor = DfOverF(
-        name = 'SignalDFoF',
-        roi_response_series = RoiResponse
-    )
+        Calc_ImSeries = create_calc_series(Calc_name, data, description, comments, microscope,Calc_ImVol, Calc_unit, scan_line_rate, [numx, numy, numz], rate, resolution, compression=True)
 
-    calcium_im_module = nwbfile.create_processing_module(
-    name = 'CalciumActivity',
-    description = 'Data and metadata associated with time series of calcium images'
-    )
+        nwbfile.add_acquisition(Calc_ImSeries)
 
-    calcium_im_module.add(CalcImSeg)
-    calcium_im_module.add(SignalFluor)
-    calcium_im_module.add(Calc_OptChanRef)
+        gce_file = datapath + '/NP_Ray/' + dataset +'/' + dataset + '_dff.csv'
 
-    io = NWBHDF5IO(datapath + '/NWB_Ray/'+identifier+'.nwb', mode='w')
+        gce_quant = pd.read_csv(gce_file)
+
+        gce_df = gce_quant[['x', 'y', 'z', 'dff', 'neuron_id', 't', 'neuron_ndx']]
+
+        blobquant = None
+        for idx in gce_quant['neuron_ndx'].unique():
+            blob = gce_df[gce_df['neuron_ndx']==idx]
+            blobarr = np.asarray(blob[['x','y','z','dff','neuron_id']]) 
+            blobarr = blobarr[np.newaxis, :, :]
+            if blobquant is None:
+                blobquant=blobarr
+
+            else:
+                blobquant = np.vstack((blobquant, blobarr))
+
+        volsegs = []
+
+        for t in range(blobquant.shape[1]):
+            blobs = np.squeeze(blobquant[:,t,0:3])
+            IDs = np.squeeze(blobquant[:,t,4])
+            labels = IDs.astype(str)
+            labels = np.where(labels!='nan', labels, '')
+
+            vsname = 'Seg_tpoint_'+str(t)
+            description = 'Neuron segmentation for time point ' +str(t) + ' in calcium image series'
+            volseg = create_vol_seg_centers(vsname, description, Calc_ImVol, blobs, labels=labels)
+
+            volsegs.append(volseg)
+
+
+        CalcImSeg = ImageSegmentation(
+            name = 'CalciumSeriesSegmentation',
+            plane_segmentations = volsegs
+        )
+
+        calc_IDs = np.squeeze(blobquant[:,0,4])
+        calc_labels = calc_IDs.astype(str)
+        calc_labels = np.where(calc_labels!='nan', calc_labels, '')
+
+        Calclabels = SegmentationLabels(
+            name = 'NeuronIDs',
+            labels = calc_labels,
+            description = 'Calcium ROI segmentation labels',
+            ImageSegmentation = CalcImSeg
+        )
+
+        gce_data = np.transpose(blobquant[:,:,3])
+        gce_data = gce_data.astype(float)
+
+        rt_region = volsegs[0].create_roi_table_region(
+            description = 'Segmented neurons associated with calcium image series. This rt_region uses the location of the neurons at the first time point',
+            region = list(np.arange(blobquant.shape[0]))
+        )
+
+        RoiResponse = RoiResponseSeries( # CHANGE WITH FEEDBACK FROM RAY
+            name = 'SignalCalciumImResponseSeries',
+            description = 'DF/F activity for calcium imaging data',
+            data = gce_data,
+            rois = rt_region,
+            unit = 'Percentage',
+            rate = 1.04
+        )
+
+        SignalFluor = DfOverF(
+            name = 'SignalDFoF',
+            roi_response_series = RoiResponse
+        )
+
+        calcium_im_module = nwbfile.create_processing_module(
+        name = 'CalciumActivity',
+        description = 'Data and metadata associated with time series of calcium images'
+        )
+
+        calcium_im_module.add(CalcImSeg)
+        calcium_im_module.add(SignalFluor)
+        calcium_im_module.add(Calclabels)
+
+    io = NWBHDF5IO(datapath + '/final_nwb/SK1/'+identifier+'.nwb', mode='w')
     io.write(nwbfile)
     io.close()
 
@@ -418,6 +662,7 @@ def process_yemini(folder):
     matfile = folder + '/head.mat'
     csvfile = folder + '/head.csv'
     gcampfile = folder + '/gcamp.mat'
+    gclabelfile = folder + '/gclabels.mat'
     activity = folder + '/activity.mat'
     positions = folder + '/positions.mat'
     oldact = folder +'/old_act.mat'
@@ -434,6 +679,9 @@ def process_yemini(folder):
     positiondata = sio.loadmat(positions)['neuron_positions']
     oldact = sio.loadmat(oldact)['old_neuron_activity']
     oldpos = sio.loadmat(oldpos)['old_neuron_positions']
+    gclabels = sio.loadmat(gclabelfile)['gclabels']
+
+    gclabels = np.asarray([label.replace(" ","") for label in gclabels])
 
     gcdata = np.transpose(gcdata, (3,1,0,2)) # convert data to TXYZ
 
@@ -473,15 +721,15 @@ def process_yemini(folder):
     elif prefs[3]==3:
         channels = [("mTagBFP2", "Semrock FF01-445/45-25 Brightline", "405-445-25m"), ("CyOFP1", "Semrock FF02-617/73-25 Brightline","488-610-40m"), ("mNeptune 2.5", "Semrock FF01-731/137-25 Brightline","561-731-70m"), ("Tag RFP-T", "Semrock FF02-617/73-25 Brightline", "561-610-40m"), ("GFP-GCaMP", "Semrock FF02-525/40-25 Brightline", "488-525-25m")]
 
-    NP_ImVol, NP_OptChanRef = create_im_vol(nwbfile, 'NeuroPALImVol', device, 'NeuroPAL image of C. elegans brain', channels, grid_spacing=scale)
+    NP_ImVol = create_im_vol(nwbfile, 'NeuroPALImVol', device, 'NeuroPAL image of C. elegans brain', channels, grid_spacing=scale)
 
     csv = pd.read_csv(csvfile, skiprows=6)
 
     blobs = csv[['Real X (um)', 'Real Y (um)', 'Real Z (um)', 'User ID']]
     blobs = blobs.rename(columns={'Real X (um)':'X', 'Real Y (um)':'Y', 'Real Z (um)':'Z', 'User ID':'ID'})
-    blobs['X'] = round(blobs['X'].div(scale[0]))
-    blobs['Y'] = round(blobs['Y'].div(scale[1]))
-    blobs['Z'] = round(blobs['Z'].div(scale[2]))
+    blobs['X'] = round(blobs['X'].div(scale[0])) -1
+    blobs['Y'] = round(blobs['Y'].div(scale[1])) -1
+    blobs['Z'] = round(blobs['Z'].div(scale[2])) -1
     blobs = blobs.astype({'X':'uint16', 'Y':'uint16', 'Z':'uint16'})
     pos = np.asarray(blobs[['X', 'Y', 'Z']])
     IDs = blobs['ID']
@@ -501,11 +749,10 @@ def process_yemini(folder):
     )
 
     neuroPAL_module.add(NeuroPALImSeg)
-    neuroPAL_module.add(NP_OptChanRef)
 
     NP_descrip = 'NeuroPAL structural image'
 
-    NP_image = create_image('NeuroPALImageRaw', NP_descrip, data, NP_ImVol, NP_OptChanRef, RGBW_channels=prefs)
+    NP_image = create_image('NeuroPALImageRaw', NP_descrip, data, NP_ImVol, RGBW_channels=prefs)
 
     nwbfile.add_acquisition(NP_image)
 
@@ -513,7 +760,7 @@ def process_yemini(folder):
 
     Calc_descrip = 'Imaging volume used to acquire calcium imaging data'
 
-    Calc_ImVol, Calc_OptChanRef = create_im_vol(nwbfile, 'CalciumImVol', device, Calc_descrip, gc_optchan, grid_spacing=gcscale)
+    Calc_ImVol = create_im_vol(nwbfile, 'CalciumImVol', device, Calc_descrip, gc_optchan, grid_spacing=gcscale)
 
     Calc_name = 'CalciumImageSeries'
     description = 'Raw GCaMP series images'
@@ -538,7 +785,7 @@ def process_yemini(folder):
 
         vsname = 'Seg_tpoint_'+str(t)
         description = 'Neuron segmentation for time point ' +str(t) + ' in calcium image series'
-        volseg = create_vol_seg_centers(vsname, description, Calc_ImVol, blobs, reference_images=Calc_ImSeries)
+        volseg = create_vol_seg_centers(vsname, description, Calc_ImVol, blobs)
 
         volsegs.append(volseg)
 
@@ -553,13 +800,20 @@ def process_yemini(folder):
 
         vsname = 'Seg_tpoint_'+str(t)
         description = 'Neuron positions for time point ' +str(t) + ' calculated via dNMF'
-        volseg = create_vol_seg_centers(vsname, description, Calc_ImVol, blobs, reference_images=Calc_ImSeries)
+        volseg = create_vol_seg_centers(vsname, description, Calc_ImVol, blobs)
 
         procvolsegs.append(volseg)
 
     ProcCalcImSeg = ImageSegmentation(
         name = 'CalciumSeriesSegmentationdNMF',
         plane_segmentations = procvolsegs
+    )
+
+    calcium_labels = SegmentationLabels(
+        name = 'NeuronIDs',
+        labels = gclabels,
+        description = 'Neuron labels for calcium activity traces',
+        ImageSegmentation = CalcImSeg
     )
 
     gce_data = np.transpose(activitydata)
@@ -579,7 +833,7 @@ def process_yemini(folder):
     )
 
     SignalFluor = Fluorescence(
-        name = 'CalciumFluorescence',
+        name = 'SignalRawFluor',
         roi_response_series = RoiResponse
     )
 
@@ -593,7 +847,7 @@ def process_yemini(folder):
     )
 
     dNMFFluor = Fluorescence(
-        name = 'CalciumFluorescencedNMF',
+        name = 'SignalRawFluordNMF',
         roi_response_series = RoiResponsedNMF
     )
 
@@ -606,13 +860,175 @@ def process_yemini(folder):
     calcium_im_module.add(ProcCalcImSeg)
     calcium_im_module.add(SignalFluor)
     calcium_im_module.add(dNMFFluor)
-    calcium_im_module.add(Calc_OptChanRef)
+    calcium_im_module.add(calcium_labels)
 
-    io = NWBHDF5IO(datapath + '/Yemini_NWB/'+worm+'.nwb', mode='w')
+    io = NWBHDF5IO(datapath + '/final_nwb/EY/'+worm+'.nwb', mode='w')
     io.write(nwbfile)
     io.close()
 
+def process_Yem_original(file):
+
+    worm = file.split('.')[0]
+
+    path = '/Users/danielysprague/foco_lab/data/NP_paper/all/'
+    matfile = path + file
+    ID_file = path + worm +'_ID.mat'
+    csvfile = path + worm + '.csv'
+
+    mat = sio.loadmat(matfile)
+
+    data = np.transpose(mat['data'], (1,0,2,3))
+
+    scale = np.asarray(mat['info']['scale'][0][0]).flatten()
+    prefs = np.asarray(mat['prefs']['RGBW'][0][0]).flatten()-1 #subtract 1 to adjust for matlab indexing from 1
+
+    session_start = datetime(2021,1,7, tzinfo=tz.gettz("US/Pacific")) #currently just using date of paper publication
+
+    experimenter = 'Yemini, Eviatar'
+    experiment_descrip = 'NeuroPAL whole-brain structural images'
+
+    nwbfile = gen_file('C. elegans head NeuroPAL', experimenter, experiment_descrip, worm, session_start, 'Hobert lab', 'Columbia University', ["NeuroPAL: A Multicolor Atlas for Whole-Brain Neuronal Identification in C. elegans"])
+
+    subject_description = 'NeuroPAL worm in microfluidic chip'
+    dob = session_start - timedelta(days=2)
+    growth_stage = 'YA'
+    gs_time = None
+    cultivation_temp = 20.
+    sex = "O"
+    strain = "OH16230"
+
+    nwbfile = create_subject(nwbfile, subject_description, worm, dob, growth_stage, gs_time, cultivation_temp, sex, strain)
+
+    microname = "Spinning disk confocal"
+    microdescrip = "Spinning Disk Confocal Nikon Ti-e 60x Objective, 1.2 NA	Nikon CFI Plan Apochromat VC 60XC WI"
+    manufacturer = "Nikon"
+
+    device = create_device(nwbfile, microname, microdescrip, manufacturer)
+
+    channels = [("mTagBFP2", "Semrock FF01-445/45-25 Brightline", "405-445-45m"), ("Tag RFP-T", "Semrock FF02-617/73-25 Brightline", "561-610-40m"), ("GFP-GCaMP", "Semrock FF02-525/40-25 Brightline", "488-525-25m"), ("CyOFP1", "Semrock FF02-617/73-25 Brightline", "488-610-40m"),  ("mNeptune 2.5", "Semrock FF01-731/137-25 Brightline","561-731-70m")]
+
+    NP_ImVol = create_im_vol(nwbfile, 'NeuroPALImVol', device, 'NeuroPAL image of C. elegans brain', channels, grid_spacing=scale)
+
+    csv = pd.read_csv(csvfile, skiprows=6)
+
+    blobs = csv[['Real X (um)', 'Real Y (um)', 'Real Z (um)', 'User ID']]
+    blobs = blobs.rename(columns={'Real X (um)':'X', 'Real Y (um)':'Y', 'Real Z (um)':'Z', 'User ID':'ID'})
+    blobs['X'] = round(blobs['X'].div(scale[0])) -1
+    blobs['Y'] = round(blobs['Y'].div(scale[1])) -1
+    blobs['Z'] = round(blobs['Z'].div(scale[2])) -1
+    blobs = blobs.astype({'X':'uint16', 'Y':'uint16', 'Z':'uint16'})
+    pos = np.asarray(blobs[['X', 'Y', 'Z']])
+    IDs = blobs['ID']
+    labels = IDs.replace(np.nan, '', regex=True)
+    labels = list(np.asarray(labels))
+
+    vs_descrip = 'Neuron centers for multichannel volumetric image. Weight set at 1 for all voxels. Labels refers to cell ID of segmented neurons.'
+
+    NeuroPALImSeg = ImageSegmentation(
+        name = 'NeuroPALSegmentation',
+        plane_segmentations = create_vol_seg_centers('NeuroPALNeurons', vs_descrip, NP_ImVol, pos, labels)
+    )
+
+    neuroPAL_module = nwbfile.create_processing_module(
+        name = 'NeuroPAL',
+        description = 'NeuroPAL image data and metadata'
+    )
+
+    neuroPAL_module.add(NeuroPALImSeg)
+
+    NP_descrip = 'NeuroPAL structural image'
+
+    NP_image = create_image('NeuroPALImageRaw', NP_descrip, data, NP_ImVol, RGBW_channels=prefs)
+
+    nwbfile.add_acquisition(NP_image)
+
+    io = NWBHDF5IO(datapath + '/final_nwb/NP_og/'+worm+'.nwb', mode='w')
+    io.write(nwbfile)
+    io.close()
+
+def process_chaudhary(folder):
+
+    matfile = folder + '/Composite.mat'
+    csvfile = folder + '/mark_w_names.csv'
+
+    worm = folder[-1]
+
+    mat = sio.loadmat(matfile)
+
+    data = np.transpose(mat['data'], (1,0,2,3))
+
+    scale = np.asarray([0.33, 0.33, 1])
+    prefs = np.asarray(mat['prefs']['RGBW'][0][0]).flatten()-1 #subtract 1 to adjust for matlab indexing from 1
+
+    session_start = datetime(2021,2,24, tzinfo=tz.gettz("US/Pacific")) #currently just using date of paper publication
+
+    experimenter = 'Chaudhary, Shivesh'
+    experiment_descrip = 'NeuroPAL whole-brain structural images'
+
+    nwbfile = gen_file('C. elegans head NeuroPAL', experimenter, experiment_descrip, worm, session_start, 'Lu Lab', 'Georgia Tech University', ["Graphical-model framework for automated annotation of cell identities in dense cellular images"])
+
+    subject_description = 'NeuroPAL worm in microfluidic chip'
+    dob = session_start - timedelta(days=2)
+    growth_stage = 'YA'
+    gs_time = None
+    cultivation_temp = 20.
+    sex = "O"
+    strain = "OH15495"
+
+    nwbfile = create_subject(nwbfile, subject_description, worm, dob, growth_stage, gs_time, cultivation_temp, sex, strain)
+
+    microname = "Spinning disk confocal"
+    microdescrip = "Perkin Elmer spinning disk confocal microscope 40x Objective, oil objective with an EMCCD camera"
+    manufacturer = "Perkin Elmer"
+
+    device = create_device(nwbfile, microname, microdescrip, manufacturer)
+
+    channels = [("mNeptune 2.5", "Semrock FF01-731/137-25 Brightline","561-731-70m"), ("CyOFP1", "Semrock FF02-617/73-25 Brightline", "488-610-40m"), ("mTagBFP2", "Semrock FF01-445/45-25 Brightline", "405-445-45m"), ("Tag RFP-T", "Semrock FF02-617/73-25 Brightline", "561-610-40m")]
+
+    NP_ImVol = create_im_vol(nwbfile, 'NeuroPALImVol', device, 'NeuroPAL image of C. elegans brain', channels, grid_spacing=scale)
+
+    csv = pd.read_csv(csvfile)
+
+    blobs = csv[['##x', 'y', 'z', 'ID']]
+    blobs = blobs.rename(columns={'##x':'X', 'y':'Y', 'z':'Z', 'ID':'ID'})
+    blobs['X'] = round(blobs['X'])
+    blobs['Y'] = round(blobs['Y'])
+    blobs['Z'] = round(blobs['Z'])
+    blobs['Z'] = data.shape[2] - blobs['Z']
+    blobs = blobs.astype({'X':'uint16', 'Y':'uint16', 'Z':'uint16'})
+    pos = np.asarray(blobs[['X', 'Y', 'Z']])
+    IDs = blobs['ID']
+    labels = IDs.replace(np.nan, '', regex=True)
+    labels = list(np.asarray(labels))
+
+    vs_descrip = 'Neuron centers for multichannel volumetric image. Weight set at 1 for all voxels. Labels refers to cell ID of segmented neurons.'
+
+    NeuroPALImSeg = ImageSegmentation(
+        name = 'NeuroPALSegmentation',
+        plane_segmentations = create_vol_seg_centers('NeuroPALNeurons', vs_descrip, NP_ImVol, pos, labels)
+    )
+
+    neuroPAL_module = nwbfile.create_processing_module(
+        name = 'NeuroPAL',
+        description = 'NeuroPAL image data and metadata'
+    )
+
+    neuroPAL_module.add(NeuroPALImSeg)
+
+    NP_descrip = 'NeuroPAL structural image'
+
+    NP_image = create_image('NeuroPALImageRaw', NP_descrip, data, NP_ImVol, RGBW_channels=prefs)
+
+    nwbfile.add_acquisition(NP_image)
+
+    io = NWBHDF5IO('/Users/danielysprague/foco_lab/data/final_nwb/HL'+worm+'.nwb', mode='w')
+    io.write(nwbfile)
+    io.close()
+
+    return
+
 if __name__ == '__main__':
+
     datapath = '/Users/danielysprague/foco_lab/data'
 
     
@@ -622,18 +1038,29 @@ if __name__ == '__main__':
                    '20230322-20-16-50':'OH16230', '20230322-21-41-10':'FC128', '20230322-22-43-03':'FC128',
                    '20230506-12-56-00':'FC121', '20230506-13-32-08':'FC121', '20230506-14-24-57':'FC121',
                    '20230506-15-01-45':'OH16230', '20230506-15-33-51':'OH16230', '20230510-12-53-34':'FC121',
-                   '20230510-13-25-46':'FC121', '20230510-15-49-47':'FC128', '20230510-16-36-46':'FC128'}
+                   '20230510-13-25-46':'FC121', '20230510-15-49-47':'FC128', '20230510-16-36-46':'FC128',
+                   '20230904-14-30-52':'FC111' , '20230904-15-09-05': 'FC111', '20230904-15-59-40': 'FC128',
+                   '20230909-16-48-09':'FC121'}
+
+    calc_datasets = ['20230322-18-57-04', '20230322-20-16-50', '20230506-15-33-51', '20230506-15-01-45']
+    ignore_datasets = ['20230506-13-32-08', '20221215-22-02-55', '20230510-16-36-46', '20230909-14-26-56', '20230909-15-40-07']
 
     for folder in os.listdir(datapath+'/NP_Ray'):
-        if folder == '.DS_Store':
+        if folder == '.DS_Store' or folder in ignore_datasets:
             continue
+
         strain = strain_dict[folder]
         print(folder)
         t0 = time.time()
-        process_NP_FOCO_Ray(datapath, folder, strain)
+        if folder in calc_datasets:
+            process_NP_FOCO_Ray(datapath, folder, strain, calc=True)
+        else:
+            process_NP_FOCO_Ray(datapath, folder, strain)
         t1 = time.time()
         print(t1-t0)
+    
     '''
+    
     for folder in os.listdir(datapath+'/Yemini_21/OH16230/Heads'):
         if folder == '.DS_Store':
             continue
@@ -642,4 +1069,31 @@ if __name__ == '__main__':
         process_yemini(datapath + '/Yemini_21/OH16230/Heads/'+folder)
         t1 = time.time()
         print(t1-t0)
+
+
+    for folder in os.listdir(datapath+'/NP_FOCO_cropped'):
+        if folder == '.DS_Store':
+            continue
+        strain = 'OH16230'
+
+        print(folder)
+
+        if folder == '2022-04-26-w00-NP1' or folder == '2022-04-26-w01-NP1':
+            process_NP_FOCO_original(datapath, folder, strain, calc=True)
+        else:
+            process_NP_FOCO_original(datapath, folder, strain, calc=False)
+
+    
+        
+    for file in os.listdir(datapath+'/NP_paper/all'):
+        if file[-4:] == '.mat' and file[-6:]!='ID.mat':
+            print(file)
+            process_Yem_original(file)
+
+
+    for folder in os.listdir(datapath+ '/NP_chaudhary'):
+        print(folder)
+        if folder == '.DS_Store':
+            continue
+        process_chaudhary(datapath+ '/NP_chaudhary/'+ folder)
     '''
