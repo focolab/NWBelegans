@@ -210,7 +210,7 @@ def iter_calc_tiff(filename, numZ):
 
     return
 
-def process_NP_FOCO_original(datapath,dataset, strain, calc = False):
+def process_SK2(datapath,dataset, strain, calc = False):
 
     identifier = dataset
     session_description = 'NeuroPAL and calcium imaging of immobilized worm with optogenetic stimulus'
@@ -433,7 +433,7 @@ def process_NP_FOCO_original(datapath,dataset, strain, calc = False):
     io.close()
 
 
-def process_NP_FOCO_Ray(datapath, dataset, strain, calc=False):
+def process_SK1(datapath, dataset, strain, calc=False):
 
 
     identifier = dataset
@@ -656,7 +656,7 @@ def process_NP_FOCO_Ray(datapath, dataset, strain, calc=False):
     io.write(nwbfile)
     io.close()
 
-def process_yemini(folder):
+def process_EY(folder):
     worm = folder.split('/')[-1]
 
     matfile = folder + '/head.mat'
@@ -866,7 +866,7 @@ def process_yemini(folder):
     io.write(nwbfile)
     io.close()
 
-def process_Yem_original(file):
+def process_NPog(file):
 
     worm = file.split('.')[0]
 
@@ -946,7 +946,7 @@ def process_Yem_original(file):
     io.write(nwbfile)
     io.close()
 
-def process_chaudhary(folder):
+def process_HL(folder):
 
     matfile = folder + '/Composite.mat'
     csvfile = folder + '/mark_w_names.csv'
@@ -1053,9 +1053,9 @@ if __name__ == '__main__':
         print(folder)
         t0 = time.time()
         if folder in calc_datasets:
-            process_NP_FOCO_Ray(datapath, folder, strain, calc=True)
+            process_SK1(datapath, folder, strain, calc=True)
         else:
-            process_NP_FOCO_Ray(datapath, folder, strain)
+            process_SK1(datapath, folder, strain)
         t1 = time.time()
         print(t1-t0)
     
@@ -1066,7 +1066,7 @@ if __name__ == '__main__':
             continue
         print(folder)
         t0 = time.time()
-        process_yemini(datapath + '/Yemini_21/OH16230/Heads/'+folder)
+        process_EY(datapath + '/Yemini_21/OH16230/Heads/'+folder)
         t1 = time.time()
         print(t1-t0)
 
@@ -1079,21 +1079,21 @@ if __name__ == '__main__':
         print(folder)
 
         if folder == '2022-04-26-w00-NP1' or folder == '2022-04-26-w01-NP1':
-            process_NP_FOCO_original(datapath, folder, strain, calc=True)
+            process_SK2_original(datapath, folder, strain, calc=True)
         else:
-            process_NP_FOCO_original(datapath, folder, strain, calc=False)
+            process_SK2_original(datapath, folder, strain, calc=False)
 
     
         
     for file in os.listdir(datapath+'/NP_paper/all'):
         if file[-4:] == '.mat' and file[-6:]!='ID.mat':
             print(file)
-            process_Yem_original(file)
+            process_NPog(file)
 
 
     for folder in os.listdir(datapath+ '/NP_chaudhary'):
         print(folder)
         if folder == '.DS_Store':
             continue
-        process_chaudhary(datapath+ '/NP_chaudhary/'+ folder)
+        process_HL(datapath+ '/NP_chaudhary/'+ folder)
     '''
