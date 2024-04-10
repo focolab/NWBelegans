@@ -31,6 +31,9 @@ setuptools.setup(
         'scikit-image',
         'pynwb',
         'nwbinspector',
-        'dandi'
+        'dandi',
+        'networkx',
+        'tifffile',
+        'networkx'
     ], 
 )

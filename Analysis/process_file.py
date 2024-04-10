@@ -16,12 +16,14 @@ def get_nwb_neurons(filepath, atlas_neurons):
     '''
     with NWBHDF5IO(filepath, mode='r', load_namespaces=True) as io:
         read_nwb = io.read()
+        identifier = read_nwb.identifier
         seg = read_nwb.processing['NeuroPAL']['NeuroPALSegmentation']['NeuroPALNeurons'].voxel_mask[:]
         labels = read_nwb.processing['NeuroPAL']['NeuroPALSegmentation']['NeuroPALNeurons']['ID_labels'][:]
         channels = read_nwb.acquisition['NeuroPALImageRaw'].RGBW_channels[:] #get which channels of the image correspond to which RGBW pseudocolors
         image = read_nwb.acquisition['NeuroPALImageRaw'].data[:]
         scale = read_nwb.imaging_planes['NeuroPALImVol'].grid_spacing[:] #get which channels of the image correspond to which RGBW pseudocolors
     
+    print(identifier)
     labels = ["".join(label) for label in labels]
 
     blobs = pd.DataFrame.from_records(seg, columns = ['X', 'Y', 'Z', 'weight'])
@@ -76,6 +78,8 @@ def get_dataset_online(dandi_id, atlas_neurons):
                     image = read_nwb.acquisition['NeuroPALImageRaw'].data[:]
                     scale = read_nwb.imaging_planes['NeuroPALImVol'].grid_spacing[:] #get which channels of the image correspond to which RGBW pseudocolors
 
+                print(identifier)
+                
                 labels = ["".join(label) for label in labels]
 
                 labels = [label[:-1] if label.endswith('?') else label for label in labels]
@@ -101,9 +105,6 @@ def get_dataset_online(dandi_id, atlas_neurons):
                 dataset[identifier] = blobs
 
     return dataset
-
-
-
 
 def combine_datasets(datasets):
 
