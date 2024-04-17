@@ -33,7 +33,13 @@ setuptools.setup(
         'nwbinspector',
         'dandi',
         'networkx',
-        'tifffile',
-        'networkx'
+        'networkx',
+        'adjustText',
+        'latex',
+        'PyWavelets',
+        'seaborn',
+        'scikit-learn',
+        'remfile',
+        'pyqt6'
     ], 
 )

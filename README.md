@@ -3,11 +3,10 @@
 
 NWB is an HDF5 based standard data format for neuroscience data with APIs in both Python and Matlab. We think that standardizing to this common format will enable ease of collaboration and data sharing between labs.
 
-This repository contains tutorials and examples of conversions of NeuroPAL structural images and whole-brain calcium imaging data 
-and metadata to the standard NWB format. 
+This repository contains tutorials and examples of conversions of NeuroPAL structural images and whole-brain calcium imaging data and metadata to the standard NWB format as well as example code for various analyses that can be done using converted NWB files.  
 
 Start with the NWB_tutorial.ipynb file which provides a walkthrough of the basics of NWB, creating objects, adding data, and writing
-the NWB file to disk. Please read the NWB file components section of this README as well for descriptions of the contents of the NWB files and conventions for naming objects. Go to https://ucsf.box.com/s/8kbdfywefcfsn4pfextrzcr25az1vmuj for a video tutorial and a folder containing the example data used in the tutorial.
+the NWB file to disk. Please read the NWB file components section of this README as well for descriptions of the contents of the NWB files and conventions for naming objects. Go to https://ucsf.box.com/s/8kbdfywefcfsn4pfextrzcr25az1vmuj for a video tutorial and a folder containing the example data used in the conversion tutorial and the various example analyses in this repository. Please download this data folder and add it to your local version of this repository.
 
 After you have created your NWB files, follow the instructions at https://www.dandiarchive.org/handbook/13_upload/ to upload your data 
 to Dandi.
@@ -25,6 +24,10 @@ suggestions for improvement.
 3. Direct to the root of the local repository and run the command 'pip install .' from the command line 
 
 4. You will also need to run 'python -m ipykernel install --user --name=*name of your environment*' to install the virtual environment as an ipython kernel
+
+# Analysis folder
+
+
 
 # NWB file components
 

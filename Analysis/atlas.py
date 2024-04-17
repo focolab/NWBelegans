@@ -146,7 +146,7 @@ class NPAtlas:
 
         df_conv_atlas = convert_coordinates(df_atlas)
 
-        df_atlas['ganglion'].fillna('other', inplace=True)
+        df_atlas.fillna({'ganglion':'other'}, inplace=True)
 
         custom_sort_order = ['Anterior Pharyngeal Bulb', 'Anterior Ganglion', 'Dorsal Ganglion', 'Lateral Ganglion', 'Ventral Ganglion', 'Retro Vesicular Ganglion', 'Posterior Pharyngeal Bulb', 'other']
 
@@ -271,7 +271,7 @@ class NWBAtlas:
 
         df_conv_atlas = convert_coordinates(df_atlas, vRecenter=vRecenter)
 
-        df_atlas['ganglion'].fillna('other', inplace=True)
+        df_atlas.fillna({'ganglion':'other'}, inplace=True)
 
         custom_sort_order = ['Anterior Pharyngeal Bulb', 'Anterior Ganglion', 'Dorsal Ganglion', 'Lateral Ganglion', 'Ventral Ganglion', 'Retro Vesicular Ganglion', 'Posterior Pharyngeal Bulb', 'other']
 
