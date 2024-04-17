@@ -41,9 +41,9 @@ def get_nwb_neurons(filepath, atlas_neurons):
     blobs[['xr', 'yr', 'zr']] = [[row['x']*scale[0],row['y']*scale[1], row['z']*scale[2]] for i, row in blobs.iterrows()]
     blobs['ID'] = [labels[i] for i in idx_keep]
 
-    blobs = blobs.replace('nan', np.nan, regex=True) 
+    blobs = blobs.replace('nan', '', regex=True) 
 
-    blobs = blobs[blobs['ID'].isin(atlas_neurons)]
+    #blobs = blobs[blobs['ID'].isin(atlas_neurons)]
 
     return blobs, RGB
 
@@ -98,9 +98,9 @@ def get_dataset_online(dandi_id, atlas_neurons):
                 blobs[['xr', 'yr', 'zr']] = [[row['x']*scale[0],row['y']*scale[1], row['z']*scale[2]] for i, row in blobs.iterrows()]
                 blobs['ID'] = [labels[i] for i in idx_keep]
 
-                blobs = blobs.replace('nan', np.nan, regex=True) 
+                blobs = blobs.replace('nan', '', regex=True) 
 
-                blobs = blobs[blobs['ID'].isin(atlas_neurons)]
+                #blobs = blobs[blobs['ID'].isin(atlas_neurons)]
 
                 dataset[identifier] = blobs
 

@@ -62,7 +62,7 @@ def get_NP_atlas(atlas_file):
 
 class NPAtlas:
 
-    def __init__(self, atlas_file = 'data/atlases/atlas_xx_rgb.mat', ganglia = 'data/atlases/neuron_ganglia.csv'):
+    def __init__(self, atlas_file = '../data/atlases/atlas_xx_rgb.mat', ganglia = '../data/neuron_ganglia.csv'):
         
         self.ganglia = pd.read_csv(ganglia)
         atlasfile = loadmat(atlas_file)
@@ -164,7 +164,7 @@ class NPAtlas:
         return self.df
 
 class NWBAtlas:
-    def __init__(self, atlas_file = '/Users/danielysprague/foco_lab/data/atlases/2023_11_02_1.pkl', ganglia = '/Users/danielysprague/foco_lab/data/atlases/neuron_ganglia.csv'):
+    def __init__(self, atlas_file = '../data/atlases/2023_11_02_1.pkl', ganglia = '../data/neuron_ganglia.csv'):
 
         self.ganglia = pd.read_csv(ganglia)
         with open(atlas_file, 'rb') as f:
