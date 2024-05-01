@@ -1,6 +1,5 @@
 import numpy as np
 
-
 def hist_match(sample_image, ref_hist):
     im_flat = sample_image.reshape(-1, sample_image.shape[-1])
 
@@ -8,7 +7,7 @@ def hist_match(sample_image, ref_hist):
 
     Amax = np.max(sample_image)
 
-    M = np.zeros((3, Amax+1), 'uint32')
+    M = np.zeros((3, int(Amax+1)), 'uint32')
 
     for l in range(3): # loop through channels
         chan_flat = im_flat[:,l]
@@ -16,7 +15,7 @@ def hist_match(sample_image, ref_hist):
 
         usemax = np.max(chan_flat)
 
-        useedges = np.linspace(0, usemax+1, usemax+2)
+        useedges = np.linspace(0, int(usemax+1), int(usemax+2))
 
         histcounts, edges = np.histogram(chan_flat, useedges)
 
@@ -25,7 +24,7 @@ def hist_match(sample_image, ref_hist):
         sumref = np.cumsum(chan_ref)
         cdf_ref = sumref / np.max(sumref)
 
-        for idx in range(usemax+1):
+        for idx in range(int(usemax+1)):
             ind = np.argmin(np.abs(cdf[idx]-cdf_ref))
             M[l, idx] = ind
 

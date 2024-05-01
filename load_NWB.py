@@ -12,6 +12,8 @@ from dandi.dandiapi import DandiAPIClient
 import remfile
 import pickle
 
+from histmatch import hist_match
+
 from pynwb import load_namespaces, get_class, register_class, NWBFile, TimeSeries, NWBHDF5IO
 from pynwb.file import MultiContainerInterface, NWBContainer, Device, Subject
 from pynwb.ophys import ImageSeries, OnePhotonSeries, OpticalChannel, ImageSegmentation, PlaneSegmentation, Fluorescence, DfOverF, CorrectedImageStack, MotionCorrection, RoiResponseSeries, ImagingPlane
@@ -22,12 +24,15 @@ from pynwb.image import ImageSeries
 
 from ndx_multichannel_volume import CElegansSubject, OpticalChannelReferences, OpticalChannelPlus, ImagingVolume, VolumeSegmentation, MultiChannelVolume, MultiChannelVolumeSeries
 
-def load_NWB(datapath, folders, match, group_assigns, bodypart='head', histmatched=True, skipfiles=[]):
+def load_NWB(datapath, folders, match, group_assigns, bodypart='head', histmatched=True, crop={}, skipfiles=[]):
 
     ims = []
     group = []
     filenames = []
     to_match = []
+
+    if histmatched:
+        ref_hist = loadmat('./data/ref_histogram.mat')['avg_hist']
 
     for i, folder in enumerate(folders):
         match_folder = match[i]
@@ -61,24 +66,28 @@ def load_NWB(datapath, folders, match, group_assigns, bodypart='head', histmatch
                         blobs = pd.DataFrame.from_records(seg, columns = ['X', 'Y', 'Z', 'weight'])
                         blobs = blobs.drop(['weight'], axis=1)
 
-                        histmatch_mat = loadmat('/Users/danielysprague/foco_lab/data/hist_matched_test3/'+identifier+'.mat')
+                        #histmatch_mat = loadmat('/Users/danielysprague/foco_lab/data/hist_matched_test3/'+identifier+'.mat')
 
-                        if dandi_id == '000692':
-                            RGBW = histmatch_mat['data_matched']
-                        else:
-                            RGBW = np.transpose(histmatch_mat['data_matched'], (1,0,2,3))
+                        #if dandi_id == '000692':
+                        #    RGBW = histmatch_mat['data_matched']
+                        #else:
+                        #    RGBW = np.transpose(histmatch_mat['data_matched'], (1,0,2,3))
+
+                        RGB = image[:,:,:,channels[:3]]
 
                         if not histmatched:
                             print('not matched')
-                            RGB = image[:,:,:,channels[:-1]]
+                            #RGB = image[:,:,:,channels[:-1]]
                             zscore_RGB = Zscore_frame(RGB)
 
                         else:
                             print('matched')
-                            zscore_RGB = Zscore_frame(RGBW[:,:,:]) 
+                            RGB = hist_match(RGB, ref_hist)
+                            zscore_RGB = Zscore_frame(RGB) 
 
-                        if dandi_id == '000565':
-                            with open('/Users/danielysprague/foco_lab/data/SK1_crop.pkl', 'rb') as f:
+                        if folder in crop.keys():
+                            crop_file = crop[folder]
+                            with open(crop_file, 'rb') as f:
                                 cropped_dict = pickle.load(f)
                             start_x = int(cropped_dict[identifier][0])
                             end_x = int(cropped_dict[identifier][1])
@@ -88,8 +97,19 @@ def load_NWB(datapath, folders, match, group_assigns, bodypart='head', histmatch
                             blobs=blobs.reset_index()
                             labels = [labels[i] for i in idx_keep]
 
-                        idx_keep = [i for i, row in blobs.iterrows() if (row['x']<RGBW.shape[0]) and (row['y']<RGBW.shape[1]) and (row['z']<RGBW.shape[2])]
-                        blobs = blobs[(blobs['x']<RGBW.shape[0])&(blobs['y']<RGBW.shape[1])&(blobs['z']<RGBW.shape[2])]
+                        #if dandi_id == '000565':
+                        #    with open('/Users/danielysprague/foco_lab/data/SK1_crop.pkl', 'rb') as f:
+                        #        cropped_dict = pickle.load(f)
+                        #    start_x = int(cropped_dict[identifier][0])
+                        #    end_x = int(cropped_dict[identifier][1])
+                        #    blobs = blobs[(blobs['x']>start_x)&(blobs['x']<end_x)]
+                        #    idx_keep = [i for i, row in blobs.iterrows() if (row['x']>start_x) and (row['x']<end_x)]
+                        #    blobs['x'] = blobs['x'] - start_x
+                        #    blobs=blobs.reset_index()
+                        #    labels = [labels[i] for i in idx_keep]
+
+                        idx_keep = [i for i, row in blobs.iterrows() if (row['x']<RGB.shape[0]) and (row['y']<RGB.shape[1]) and (row['z']<RGB.shape[2])]
+                        blobs = blobs[(blobs['x']<RGB.shape[0])&(blobs['y']<RGB.shape[1])&(blobs['z']<RGB.shape[2])]
 
                         blobs[['R','G','B']] = [zscore_RGB[row['x'],row['y'],row['z'],:] for i, row in blobs.iterrows()]
                         blobs[['xr', 'yr', 'zr']] = [[row['x']*scale[0],row['y']*scale[1], row['z']*scale[2]] for i, row in blobs.iterrows()]
@@ -151,21 +171,28 @@ def load_NWB(datapath, folders, match, group_assigns, bodypart='head', histmatch
                 blobs = pd.DataFrame.from_records(seg, columns = ['X', 'Y', 'Z', 'weight'])
                 blobs = blobs.drop(['weight'], axis=1)
 
-                histmatch_mat = loadmat('/Users/danielysprague/foco_lab/data/hist_matched_test3/'+file[:-4]+'.mat')
+                #histmatch_mat = loadmat('/Users/danielysprague/foco_lab/data/hist_matched_test3/'+identifier+'.mat')
 
-                RGBW = np.transpose(histmatch_mat['data_matched'], (1,0,2,3))
+                #if dandi_id == '000692':
+                #    RGBW = histmatch_mat['data_matched']
+                #else:
+                #    RGBW = np.transpose(histmatch_mat['data_matched'], (1,0,2,3))
+
+                RGB = image[:,:,:,channels[:3]]
 
                 if not histmatched:
                     print('not matched')
-                    RGB = image[:,:,:,channels[:-1]]
+                    #RGB = image[:,:,:,channels[:-1]]
                     zscore_RGB = Zscore_frame(RGB)
 
                 else:
                     print('matched')
-                    zscore_RGB = Zscore_frame(RGBW[:,:,:])
+                    RGB = hist_match(RGB, ref_hist)
+                    zscore_RGB = Zscore_frame(RGB) 
 
-                if folder == 'SK1':
-                    with open('/Users/danielysprague/foco_lab/data/SK1_crop.pkl', 'rb') as f:
+                if folder in crop.keys():
+                    crop_file = crop[folder]
+                    with open(crop_file, 'rb') as f:
                         cropped_dict = pickle.load(f)
                     start_x = int(cropped_dict[identifier][0])
                     end_x = int(cropped_dict[identifier][1])
@@ -175,8 +202,19 @@ def load_NWB(datapath, folders, match, group_assigns, bodypart='head', histmatch
                     blobs=blobs.reset_index()
                     labels = [labels[i] for i in idx_keep]
 
-                idx_keep = [i for i, row in blobs.iterrows() if (row['x']<RGBW.shape[0]) and (row['y']<RGBW.shape[1]) and (row['z']<RGBW.shape[2])]
-                blobs = blobs[(blobs['x']<RGBW.shape[0])&(blobs['y']<RGBW.shape[1])&(blobs['z']<RGBW.shape[2])]
+                #if folder == 'SK1':
+                #    with open('/Users/danielysprague/foco_lab/data/SK1_crop.pkl', 'rb') as f:
+                #        cropped_dict = pickle.load(f)
+                #    start_x = int(cropped_dict[identifier][0])
+                #    end_x = int(cropped_dict[identifier][1])
+                #    blobs = blobs[(blobs['x']>start_x)&(blobs['x']<end_x)]
+                #    idx_keep = [i for i, row in blobs.iterrows() if (row['x']>start_x) and (row['x']<end_x)]
+                #    blobs['x'] = blobs['x'] - start_x
+                #    blobs=blobs.reset_index()
+                #    labels = [labels[i] for i in idx_keep]
+
+                idx_keep = [i for i, row in blobs.iterrows() if (row['x']<RGB.shape[0]) and (row['y']<RGB.shape[1]) and (row['z']<RGB.shape[2])]
+                blobs = blobs[(blobs['x']<RGB.shape[0])&(blobs['y']<RGB.shape[1])&(blobs['z']<RGB.shape[2])]
 
                 blobs[['R','G','B']] = [zscore_RGB[row['x'],row['y'],row['z'],:] for i, row in blobs.iterrows()]
                 blobs[['xr', 'yr', 'zr']] = [[row['x']*scale[0],row['y']*scale[1], row['z']*scale[2]] for i, row in blobs.iterrows()]

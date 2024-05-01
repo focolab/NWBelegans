@@ -1,5 +1,19 @@
-# C. elegans optophysiology NWB conversion
+# NWBelegans: Tools for converting to and analyzing NWB files for _C. elegans_ whole-brain activity and NeuroPAL imaging
 ### Author: Daniel Sprague
+
+
+
+## Installation instructions
+
+1. Setup a python virtual environment and activate that environment (we typically use Anaconda)
+
+2. Fork this repository to your local drive
+
+3. Direct to the root of the local repository and run the command 'pip install .' from the command line 
+
+4. You will also need to run 'python -m ipykernel install --user --name=*name of your environment*' to install the virtual environment as an ipython kernel
+
+
 
 NWB is an HDF5 based standard data format for neuroscience data with APIs in both Python and Matlab. We think that standardizing to this common format will enable ease of collaboration and data sharing between labs.
 
@@ -15,19 +29,10 @@ This project is a work in progress and we hope to continue to develop it in coll
 reach out to daniel.sprague@ucsf.edu if you have any questions about this work, are having issues with your own data conversion, or have 
 suggestions for improvement.
 
-# Installation instructions
-
-1. Setup a python virtual environment and activate that environment
-
-2. Fork this repository to your local drive
-
-3. Direct to the root of the local repository and run the command 'pip install .' from the command line 
-
-4. You will also need to run 'python -m ipykernel install --user --name=*name of your environment*' to install the virtual environment as an ipython kernel
 
 # Analysis folder
 
-
+This folder contains the code used for all of the analyses conducted in Sprague et al. 2024 [TODO: attach link to biorxiv preprint when available]. See the ReadMe within this folder for information about how to use this code. You can either stream existing NWB datasets from the dandiarchive or run the same analyses on your NWB datasets.
 
 # NWB file components
 
