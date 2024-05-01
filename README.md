@@ -1,7 +1,8 @@
 # NWBelegans: Tools for converting to and analyzing NWB files for _C. elegans_ whole-brain activity and NeuroPAL imaging
+
+Code for [Unifying community-wide whole-brain imaging datasets enables robust automated neuron identification and reveals determinants of neuron positioning in _C. elegans_](https://www.biorxiv.org/content/10.1101/2024.04.28.591397v1)
+
 ### Author: Daniel Sprague
-
-
 
 ## Installation instructions
 
@@ -13,7 +14,13 @@
 
 4. You will also need to run 'python -m ipykernel install --user --name=*name of your environment*' to install the virtual environment as an ipython kernel
 
+## Atlas training
 
+## Analysis
+
+See ReadMe in analysis folder for further details
+
+## NWB file conversion
 
 NWB is an HDF5 based standard data format for neuroscience data with APIs in both Python and Matlab. We think that standardizing to this common format will enable ease of collaboration and data sharing between labs.
 
