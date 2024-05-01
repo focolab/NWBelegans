@@ -2,23 +2,31 @@
 
 Code for [Unifying community-wide whole-brain imaging datasets enables robust automated neuron identification and reveals determinants of neuron positioning in _C. elegans_](https://www.biorxiv.org/content/10.1101/2024.04.28.591397v1)
 
+All necessary data for running the example code provided in this repository can be found on [box](https://ucsf.box.com/s/ofgt45dcc3zw093ppfop879gc4cqjf3t). You can download this whole folder and place it within the NWBelegans root directory. The larger NWB file datasets can either be downloaded or streamed directly from the [DANDI archive](https://dandiarchive.org). Further details and examples on how to stream this data can be found in NWB_stream.ipynb, load_NWB.py, and Analysis/process_file.py.
+
+See [WormID.org](www.wormid.org) for further details about the datasets and other resources included in this work.
+
 ### Author: Daniel Sprague
 
 ## Installation instructions
 
 1. Setup a python virtual environment and activate that environment (we typically use Anaconda)
 
-2. Fork this repository to your local drive
+2. Fork this repository to your own Github account
 
-3. Direct to the root of the local repository and run the command 'pip install .' from the command line 
+3. Clone the forked repository onto your local drive with the --recurse-submodules flag (git clone --recurse-submodules https://github.com/focolab/NWBelegans/tree/main). Replace the link with the link to your forked repository
 
-4. You will also need to run 'python -m ipykernel install --user --name=*name of your environment*' to install the virtual environment as an ipython kernel
+4. Direct to the root of the local repository and run the command 'pip install .' from the command line 
+
+5. You will also need to run 'python -m ipykernel install --user --name=*name of your environment*' to install the virtual environment as an ipython kernel
 
 ## Atlas training
 
+Example code for training the Statistical Atlas using the NWB datasets provided in this work can be found in the NWB_atlas.ipynb folder. This code uses the Statistical Atlas model presented in [Varol et al. 2020](https://link.springer.com/chapter/10.1007/978-3-030-59722-1_12).
+
 ## Analysis
 
-See ReadMe in analysis folder for further details
+See ReadMe in analysis folder for further details.
 
 ## NWB file conversion
 
@@ -30,7 +38,7 @@ Start with the NWB_tutorial.ipynb file which provides a walkthrough of the basic
 the NWB file to disk. Please read the NWB file components section of this README as well for descriptions of the contents of the NWB files and conventions for naming objects. Go to https://ucsf.box.com/s/8kbdfywefcfsn4pfextrzcr25az1vmuj for a video tutorial and a folder containing the example data used in the conversion tutorial and the various example analyses in this repository. Please download this data folder and add it to your local version of this repository.
 
 After you have created your NWB files, follow the instructions at https://www.dandiarchive.org/handbook/13_upload/ to upload your data 
-to Dandi.
+to Dandi. Further details and guidelines on this conversion process can be found at [WormID.org](https://www.wormid.org/how-to-use).
 
 This project is a work in progress and we hope to continue to develop it in collaboration with other *C. elegans* neuroscientists. Please
 reach out to daniel.sprague@ucsf.edu if you have any questions about this work, are having issues with your own data conversion, or have 
