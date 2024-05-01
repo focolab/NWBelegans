@@ -1,0 +1,3 @@
+[submodule "stat-atlas"]
+	path = stat-atlas
+	url = git@github.com:amin-nejat/stat-atlas.git
