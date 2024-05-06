@@ -671,6 +671,29 @@ def process_EY(folder):
     mat = sio.loadmat(matfile)
     gcamp = sio.loadmat(gcampfile)
 
+    stim_names = np.asarray(['butanone', 'pentanedione', 'nacl'])
+
+    stimulus = sio.loadmat('/Users/danielysprague/foco_lab/data/NeuroPAL data/Whole-Brain Calcium Activity/Young Adults/Head_Activity_OH16230.mat')
+
+    worm_ref = worm[4:]
+    stim_index = [i for i in range(stimulus['files'].shape[0]) if stimulus['files'][i][0][0]==worm_ref][0]
+
+    stim_times = stimulus['stim_times']
+
+    stim_order = stimulus['stims'][stim_index,:] -1
+
+    stims_in_order = stim_names[stim_order]
+
+    chem_stims = TimeIntervals(
+        name = 'chemical_stimuli',
+        description = 'Chemical stimuli delivered to  the worm. Each worms gets 160 mM NaCl, 10^-4mM 2-butanone, and 10^-4 2,3-pentanedione in a random order. Start and stop time represent seconds from start of the experiment'
+    )
+
+    chem_stims.add_column(name='stimulus', description = 'which stimulus is active')
+
+    for i in range(3):
+        chem_stims.add_row(start_time=stim_times[i,0], stop_time = stim_times[i,1], stimulus=stims_in_order[i])
+
     data = np.transpose(mat['data']*4095, (1,0,2,3))
 
     gcdata = gcamp['data']
@@ -707,6 +730,8 @@ def process_EY(folder):
     cultivation_temp = 20.
     sex = "O"
     strain = "OH16230"
+
+    nwbfile.add_time_intervals(chem_stims) # add stimuli to NWB file
 
     nwbfile = create_subject(nwbfile, subject_description, worm, dob, growth_stage, gs_time, cultivation_temp, sex, strain)
 
@@ -862,7 +887,7 @@ def process_EY(folder):
     calcium_im_module.add(dNMFFluor)
     calcium_im_module.add(calcium_labels)
 
-    io = NWBHDF5IO(datapath + '/final_nwb/EY/'+worm+'.nwb', mode='w')
+    io = NWBHDF5IO(datapath + '/final_nwb/EY_stim_test/'+worm+'.nwb', mode='w')
     io.write(nwbfile)
     io.close()
 
@@ -1031,7 +1056,7 @@ if __name__ == '__main__':
 
     datapath = '/Users/danielysprague/foco_lab/data'
 
-    
+    '''
     strain_dict = {'20221028-18-48-00':'FC121', '20221106-21-00-09':'FC121', '20221106-21-23-19':'FC121',
                    '20221106-21-23-19':'FC121', '20221106-21-47-31':'FC121', '20221215-20-02-49':'FC121',
                    '20221215-22-02-55':'FC121', '20230412-20-15-17':'FC121', '20230322-18-57-04':'OH16230',
@@ -1070,7 +1095,7 @@ if __name__ == '__main__':
         t1 = time.time()
         print(t1-t0)
 
-
+    '''
     for folder in os.listdir(datapath+'/NP_FOCO_cropped'):
         if folder == '.DS_Store':
             continue
