@@ -14,7 +14,7 @@ See [WormID.org](www.wormid.org) for further details about the datasets and othe
 
 2. Fork this repository to your own Github account
 
-3. Clone the forked repository onto your local drive with the --recurse-submodules flag (git clone --recurse-submodules https://github.com/focolab/NWBelegans/tree/main). Replace the link with the link to your forked repository
+3. Clone the forked repository onto your local drive with the --recurse-submodules flag (git clone --recurse-submodules https://github.com/focolab/NWBelegans). Replace the link at the end with the link to your forked repository
 
 4. Direct to the root of the local repository and run the command 'pip install .' from the command line 
 

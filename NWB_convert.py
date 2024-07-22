@@ -716,7 +716,7 @@ def process_EY(folder):
     
     gcscale = np.asarray(gcamp['worm_data']['info'][0][0][0][0][1]).flatten()
 
-    session_start = datetime(int(worm[0:4]),int(worm[4:6]),int(worm[6:8]), tzinfo=tz.gettz("US/Pacific"))
+    session_start = datetime(int(worm[0:4]),int(worm[4:6]),int(worm[6:8]), tzinfo=tz.gettz("US/Eastern"))
 
     experimenter = 'Yemini, Eviatar'
     experiment_descrip = 'NeuroPAL and whole-brain calcium imaging with chemical stimuli'
@@ -887,6 +887,8 @@ def process_EY(folder):
     calcium_im_module.add(dNMFFluor)
     calcium_im_module.add(calcium_labels)
 
+    print(nwbfile.stimulus)
+
     io = NWBHDF5IO(datapath + '/final_nwb/EY_stim_test/'+worm+'.nwb', mode='w')
     io.write(nwbfile)
     io.close()
@@ -907,7 +909,7 @@ def process_NPog(file):
     scale = np.asarray(mat['info']['scale'][0][0]).flatten()
     prefs = np.asarray(mat['prefs']['RGBW'][0][0]).flatten()-1 #subtract 1 to adjust for matlab indexing from 1
 
-    session_start = datetime(2021,1,7, tzinfo=tz.gettz("US/Pacific")) #currently just using date of paper publication
+    session_start = datetime(2021,1,7, tzinfo=tz.gettz("US/Eastern")) #currently just using date of paper publication
 
     experimenter = 'Yemini, Eviatar'
     experiment_descrip = 'NeuroPAL whole-brain structural images'
@@ -985,7 +987,7 @@ def process_HL(folder):
     scale = np.asarray([0.33, 0.33, 1])
     prefs = np.asarray(mat['prefs']['RGBW'][0][0]).flatten()-1 #subtract 1 to adjust for matlab indexing from 1
 
-    session_start = datetime(2021,2,24, tzinfo=tz.gettz("US/Pacific")) #currently just using date of paper publication
+    session_start = datetime(2021,2,24, tzinfo=tz.gettz("US/Eastern")) #currently just using date of paper publication
 
     experimenter = 'Chaudhary, Shivesh'
     experiment_descrip = 'NeuroPAL whole-brain structural images'
@@ -1094,6 +1096,8 @@ if __name__ == '__main__':
         process_EY(datapath + '/Yemini_21/OH16230/Heads/'+folder)
         t1 = time.time()
         print(t1-t0)
+
+        break
 
     '''
     for folder in os.listdir(datapath+'/NP_FOCO_cropped'):

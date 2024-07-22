@@ -75,16 +75,6 @@ def load_NWB(datapath, folders, match, group_assigns, bodypart='head', histmatch
 
                         RGB = image[:,:,:,channels[:3]]
 
-                        if not histmatched:
-                            print('not matched')
-                            #RGB = image[:,:,:,channels[:-1]]
-                            zscore_RGB = Zscore_frame(RGB)
-
-                        else:
-                            print('matched')
-                            RGB = hist_match(RGB, ref_hist)
-                            zscore_RGB = Zscore_frame(RGB) 
-
                         if folder in crop.keys():
                             crop_file = crop[folder]
                             with open(crop_file, 'rb') as f:
@@ -96,6 +86,17 @@ def load_NWB(datapath, folders, match, group_assigns, bodypart='head', histmatch
                             blobs['x'] = blobs['x'] - start_x
                             blobs=blobs.reset_index()
                             labels = [labels[i] for i in idx_keep]
+                            RGB = RGB[start_x:end_x,:,:,:]
+
+                        if not histmatched:
+                            print('not matched')
+                            #RGB = image[:,:,:,channels[:-1]]
+                            zscore_RGB = Zscore_frame(RGB)
+
+                        else:
+                            print('matched')
+                            RGB = hist_match(RGB, ref_hist)
+                            zscore_RGB = Zscore_frame(RGB) 
 
                         #if dandi_id == '000565':
                         #    with open('/Users/danielysprague/foco_lab/data/SK1_crop.pkl', 'rb') as f:
@@ -180,16 +181,6 @@ def load_NWB(datapath, folders, match, group_assigns, bodypart='head', histmatch
 
                 RGB = image[:,:,:,channels[:3]]
 
-                if not histmatched:
-                    print('not matched')
-                    #RGB = image[:,:,:,channels[:-1]]
-                    zscore_RGB = Zscore_frame(RGB)
-
-                else:
-                    print('matched')
-                    RGB = hist_match(RGB, ref_hist)
-                    zscore_RGB = Zscore_frame(RGB) 
-
                 if folder in crop.keys():
                     crop_file = crop[folder]
                     with open(crop_file, 'rb') as f:
@@ -201,6 +192,19 @@ def load_NWB(datapath, folders, match, group_assigns, bodypart='head', histmatch
                     blobs['x'] = blobs['x'] - start_x
                     blobs=blobs.reset_index()
                     labels = [labels[i] for i in idx_keep]
+                    RGB = RGB[start_x:end_x,:,:,:]
+
+                if not histmatched:
+                    print('not matched')
+                    #RGB = image[:,:,:,channels[:-1]]
+                    zscore_RGB = Zscore_frame(RGB)
+
+                else:
+                    print('matched')
+                    RGB = hist_match(RGB, ref_hist)
+                    zscore_RGB = Zscore_frame(RGB) 
+
+                
 
                 #if folder == 'SK1':
                 #    with open('/Users/danielysprague/foco_lab/data/SK1_crop.pkl', 'rb') as f:
